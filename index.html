@@ -141,29 +141,49 @@
         fetchWeather(); fetchForecast(); fetchWarnings();
         setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
 
-        // 6. 九巴 API (終極名字匹配防錯)
+        // 6. 九巴 API (終極無死角：雙向搜尋 + 截圖數據保底)
         async function fetchBus() {
             try {
-                const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
-                const stopData = await stopRes.json();
-                if (!stopData || !stopData.data) throw new Error("車站數據異常");
+                // 步驟一：同時索取 Inbound 同 Outbound，無視九巴嘅方向分類
+                const [outRes, inRes] = await Promise.all([
+                    fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1'),
+                    fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/inbound/1')
+                ]);
+                const outData = await outRes.json();
+                const inData = await inRes.json();
+                const allStops = [...(outData.data || []), ...(inData.data || [])];
                 
-                // 【關鍵修正】包含「形點」，但排除「II」，無視所有空格符號
-                const targetStop = stopData.data.find(s => {
-                    const name = s.name_tc || "";
-                    return name.includes('形點') && !name.includes('II');
+                if (allStops.length === 0) throw new Error("讀取唔到路線數據");
+                
+                // 步驟二：搵「形點 I」
+                let targetStop = allStops.find(s => {
+                    const name = (s.name_tc || "") + (s.name_en || "");
+                    return (name.includes('形點') || name.includes('YOHO')) && !name.includes('II') && !name.includes('2');
                 });
+                
+                // 步驟三：【終極保底】如果文字配對失敗，根據你提供嘅截圖直接抽「第 18 個站」！
+                if (!targetStop) {
+                    targetStop = allStops.find(s => String(s.seq) === '18');
+                }
                 
                 if (!targetStop) throw new Error("搵唔到形點 I 個站");
 
+                // 步驟四：獲取該實體站嘅所有 ETA (涵蓋所有 Service Type)
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStop.stop}`);
                 const etaData = await etaRes.json();
                 
-                const validEtas = (etaData.data || []).filter(eta => eta.route === '269D' && eta.dir === 'O' && eta.eta !== null && eta.eta !== "");
+                // 步驟五：認住目的地「瀝源」，絕對唔會捉錯對面線嘅車！
+                const validEtas = (etaData.data || []).filter(eta => 
+                    eta.route === '269D' && 
+                    eta.eta !== null && 
+                    eta.eta !== "" && 
+                    (eta.dest_tc && eta.dest_tc.includes('瀝')) // 只要目的地有「瀝」字就一定啱
+                );
+                
                 validEtas.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
                 if (validEtas.length === 0) {
-                    document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 尾班車已過 / 暫無班次</div>';
+                    document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 暫無班次資料</div>';
                     return;
                 }
 
@@ -176,7 +196,7 @@
 
             } catch (e) { 
                 console.error("Bus Error:", e);
-                document.getElementById('bus-data').innerHTML = `<div style="color: #ff6b81; margin-top: 15px; font-weight: bold;">系統錯誤: ${e.message}</div>`;
+                document.getElementById('bus-data').innerHTML = `<div style="color: #ff6b81; margin-top: 15px; font-weight: bold; font-size: 0.9em;">⚠️ 系統錯誤: ${e.message}</div>`;
             }
         }
         fetchBus();
