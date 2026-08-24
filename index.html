@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>實時 Dashboard</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; height: 100vh; box-sizing: border-box; }
+        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .header { display: flex; align-items: baseline; gap: 15px; color: #007aff; }
+        #time { font-size: 3em; font-weight: bold; }
+        #date { font-size: 1.5em; color: #ff6b81; font-weight: bold; }
+        .content { display: flex; gap: 15px; flex: 1; }
+        .weather-panel, .bus-panel { flex: 1; }
+        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 10px 0; }
+        .bus-item { display: flex; justify-content: space-between; font-size: 1.5em; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        .bus-route { background: #0097e6; color: white; padding: 5px 15px; border-radius: 8px; font-weight: bold;}
+        .eta { color: #2ed573; font-weight: bold; }
+        iframe { width: 100%; height: 120px; border-radius: 15px; border: none; }
+    </style>
+</head>
+<body>
+
+    <div class="card header">
+        <div id="time">載入中...</div>
+        <div id="date"></div>
+    </div>
+
+    <div class="content">
+        <div class="card weather-panel">
+            <h3>☀️ 元朗區實時天氣</h3>
+            <div class="temp"><span id="temperature">--</span>°C</div>
+            <p>💧 相對濕度: <span id="humidity">--</span>%</p>
+        </div>
+
+        <div class="card bus-panel">
+            <h3>🚌 269D 往瀝源 (形點 I)</h3>
+            <div id="bus-data">載入中...</div>
+        </div>
+    </div>
+
+    <div class="card audio-panel">
+        <!-- 這裡嵌入了 YouTube 24/7 Lofi 音樂電台作為示範 -->
+        <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1" allow="autoplay; encrypted-media"></iframe>
+    </div>
+
+    <script>
+        // 1. 實時時鐘
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('time').innerText = now.toLocaleTimeString('zh-HK', { hour12: false });
+            document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'short' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 2. 天文台天氣 API (元朗公園)
+        async function fetchWeather() {
+            try {
+                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
+                const data = await res.json();
+                const yuenLongTemp = data.temperature.data.find(d => d.place === '元朗公園').value;
+                const humidity = data.humidity.data[0].value;
+                document.getElementById('temperature').innerText = yuenLongTemp;
+                document.getElementById('humidity').innerText = humidity;
+            } catch (e) { console.error('天氣載入失敗'); }
+        }
+        fetchWeather();
+        setInterval(fetchWeather, 600000); // 10分鐘更新一次
+
+        // 3. 九巴 API (269D 形點 I 到站時間)
+        async function fetchBus() {
+            try {
+                // 自動獲取 269D 的車站列表，並篩選出「形點 I」的專屬 ID
+                const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
+                const stopData = await stopRes.json();
+                const targetStop = stopData.data.find(s => s.name_tc.includes('形點'));
+                if (!targetStop) return;
+
+                // 使用專屬 ID 獲取實時 ETA
+                const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${targetStop.stop}/269D/1`);
+                const etaData = await etaRes.json();
+                
+                const html = etaData.data.slice(0, 2).map(eta => {
+                    if (!eta.eta) return '';
+                    const minutes = Math.round((new Date(eta.eta) - new Date()) / 60000);
+                    const timeStr = new Date(eta.eta).toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
+                    return `<div class="bus-item"><span class="bus-route">269D</span><span>形點 I</span><span class="eta">${minutes > 0 ? minutes + ' 分鐘' : '即將抵達'}</span><span style="font-size:0.6em; color:#666">${timeStr}</span></div>`;
+                }).join('');
+                document.getElementById('bus-data').innerHTML = html || '暫無班次';
+            } catch (e) { document.getElementById('bus-data').innerHTML = '資料載入失敗'; }
+        }
+        fetchBus();
+        setInterval(fetchBus, 60000); // 1分鐘更新一次
+    </script>
+</body>
+</html>
