@@ -11,9 +11,17 @@
         .header { display: flex; align-items: baseline; gap: 15px; color: #007aff; }
         #time { font-size: 3em; font-weight: bold; }
         #date { font-size: 1.5em; color: #ff6b81; font-weight: bold; }
-        .content { display: flex; gap: 15px; flex: 1; }
-        .weather-panel, .bus-panel { flex: 1; }
-        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 10px 0; }
+        .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
+        .weather-panel, .bus-panel { flex: 1; display: flex; flex-direction: column; }
+        
+        /* 天氣樣式 */
+        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; }
+        #weather-warnings { min-height: 25px; margin-bottom: 5px; }
+        .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.9em; font-weight: bold; margin-right: 5px; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
+        .forecast-box { margin-top: auto; padding-top: 15px; border-top: 1px solid #eee; font-size: 0.95em; color: #555; line-height: 1.5; }
+        .forecast-box h4 { margin: 0 0 5px 0; color: #333; font-size: 1em; }
+        
+        /* 巴士樣式 */
         .bus-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.3em; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold;}
         .eta { color: #2ed573; font-weight: bold; }
@@ -36,29 +44,35 @@
 
     <div class="content">
         <div class="card weather-panel">
-            <h3>☀️ 元朗區實時天氣</h3>
+            <h3 style="margin-top:0;">☀️ 元朗區實時天氣</h3>
+            <!-- 天氣警告顯示區 -->
+            <div id="weather-warnings"></div> 
+            
             <div class="temp"><span id="temperature">--</span>°C</div>
-            <p>💧 相對濕度: <span id="humidity">--</span>%</p>
+            <p style="margin: 0;">💧 相對濕度: <span id="humidity">--</span>%</p>
+            
+            <!-- 天氣預測顯示區 -->
+            <div class="forecast-box">
+                <h4>📝 本港地區天氣預測</h4>
+                <div id="forecast-desc">載入中...</div>
+            </div>
         </div>
 
         <div class="card bus-panel">
-            <h3>🚌 269D 往瀝源 (形點 I)</h3>
+            <h3 style="margin-top:0;">🚌 269D 往瀝源 (形點 I)</h3>
             <div id="bus-data">載入中...</div>
         </div>
     </div>
 
     <div class="card audio-panel">
-        <!-- 電台選擇按鈕 -->
         <div class="radio-controls">
-            <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn active">🎧 Lofi</button>
-            <button onclick="changeRadio('NVhl0tCzFTc', this)" class="radio-btn">✝️ Christian Acoustic</button>
-            <button onclick="changeRadio('JbXp2tZmO-s', this)" class="radio-btn">☕ Ballroom Waltz</button>
-            <button onclick="changeRadio('OlrHsQ9QexE', this)" class="radio-btn">🎷 Cafe Jazz</button>
-            <!-- 若某個電台失效，只需更改引號內的 11 位字元 YouTube ID 即可 -->
+            <!-- 已換上你提供的 4 個 YouTube ID -->
+            <button onclick="changeRadio('NVhl0tCzFTc', this)" class="radio-btn active">🎧 頻道 1</button>
+            <button onclick="changeRadio('OlrHsQ9QexE', this)" class="radio-btn">🌌 頻道 2</button>
+            <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn">☕ 頻道 3</button>
+            <button onclick="changeRadio('JbXp2tZmO-s', this)" class="radio-btn">🎷 頻道 4</button>
         </div>
-        
-        <!-- 播放器 -->
-        <iframe id="youtube-player" src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1" allow="autoplay; encrypted-media"></iframe>
+        <iframe id="youtube-player" src="https://www.youtube.com/embed/NVhl0tCzFTc?autoplay=1" allow="autoplay; encrypted-media"></iframe>
     </div>
 
     <script>
@@ -71,17 +85,14 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. 切換電台頻道功能
+        // 2. 切換電台
         function changeRadio(videoId, btnElement) {
-            // 替換 iframe 網址
             document.getElementById('youtube-player').src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-            
-            // 更新按鈕顏色狀態
             document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
             btnElement.classList.add('active');
         }
 
-        // 3. 天文台天氣 API (元朗公園)
+        // 3. 天文台天氣 API (溫度、濕度)
         async function fetchWeather() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
@@ -92,22 +103,54 @@
                 document.getElementById('humidity').innerText = humidity;
             } catch (e) { console.error('天氣載入失敗'); }
         }
-        fetchWeather();
-        setInterval(fetchWeather, 600000); 
+        
+        // 4. 天文台天氣預測 API
+        async function fetchForecast() {
+            try {
+                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc');
+                const data = await res.json();
+                document.getElementById('forecast-desc').innerText = data.forecastDesc;
+            } catch (e) { 
+                document.getElementById('forecast-desc').innerText = '預測載入失敗，請稍後重試。'; 
+            }
+        }
 
-        // 4. 九巴 API (防錯機制版)
+        // 5. 天文台天氣警告 API
+        async function fetchWarnings() {
+            try {
+                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc');
+                const data = await res.json();
+                const warningContainer = document.getElementById('weather-warnings');
+                
+                if (Object.keys(data).length === 0) {
+                    warningContainer.innerHTML = '';
+                    return;
+                }
+
+                let warningHtml = '';
+                for (const key in data) {
+                    if (data[key].name) {
+                        warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`;
+                    }
+                }
+                warningContainer.innerHTML = warningHtml;
+            } catch (e) { console.error('警告載入失敗'); }
+        }
+
+        fetchWeather(); fetchForecast(); fetchWarnings();
+        setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
+
+        // 6. 九巴 API (防錯機制版)
         async function fetchBus() {
             try {
                 const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
                 const stopData = await stopRes.json();
-                
                 if (!stopData || !stopData.data || !Array.isArray(stopData.data)) throw new Error("車站數據異常");
                 const targetStop = stopData.data.find(s => s.name_tc && s.name_tc.includes('形點'));
                 if (!targetStop) throw new Error("找不到車站");
 
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${targetStop.stop}/269D/1`);
                 const etaData = await etaRes.json();
-                
                 const validEtas = (etaData.data || []).filter(eta => eta && eta.eta !== null && eta.eta !== "");
 
                 if (validEtas.length === 0) {
@@ -127,7 +170,7 @@
             }
         }
         fetchBus();
-        setInterval(fetchBus, 60000); 
+        setInterval(fetchBus, 60000); // 巴士每 1 分鐘更新
     </script>
 </body>
 </html>
