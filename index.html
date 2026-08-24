@@ -8,11 +8,16 @@
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .header { display: flex; align-items: baseline; gap: 15px; color: #007aff; flex-shrink: 0; }
+        .header { display: flex; align-items: baseline; gap: 15px; color: #007aff; flex-shrink: 0; flex-wrap: wrap; }
         #time { font-size: 3em; font-weight: bold; }
         #date { font-size: 1.5em; color: #ff6b81; font-weight: bold; }
         
         .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
+        /* 針對較窄螢幕，允許左右兩欄自動變成上下排 (若空間不足) */
+        @media (max-width: 768px) {
+            .content { flex-direction: column; overflow-y: auto; }
+            body { height: auto; min-height: 100vh; overflow: auto; }
+        }
         
         /* 天氣樣式 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
@@ -26,29 +31,32 @@
         
         /* 右側欄：包含巴士與交通 */
         .right-column { flex: 1; display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
+        @media (max-width: 768px) {
+            .right-column { overflow: visible; }
+        }
         
-        /* 巴士樣式 */
+        /* 巴士樣式 (加強自動換行與防斷字) */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .bus-item { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
-        .bus-info { display: flex; align-items: center; gap: 10px; }
+        .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
+        .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex: 1; min-width: 120px; }
         .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold; font-size: 1.1em; white-space: nowrap; }
         .bus-station { font-size: 1.1em; font-weight: 500; white-space: nowrap; color: #333; }
-        .bus-time { display: flex; flex-direction: column; align-items: flex-end; min-width: 80px; }
-        .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; white-space: nowrap; }
-        .eta-exact { font-size: 0.85em; color: #888; white-space: nowrap; margin-top: 2px; }
+        .bus-time { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+        .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; }
+        .eta-exact { font-size: 0.85em; color: #888; margin-top: 2px; }
         
         /* 交通消息樣式 */
-        .traffic-panel { display: flex; flex-direction: column; overflow-y: auto; max-height: 25%; }
+        .traffic-panel { display: flex; flex-direction: column; overflow-y: auto; max-height: 35%; }
         .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
         .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
-        /* 音樂按鈕樣式 (畫面已隱藏) */
+        /* 音樂按鈕樣式 (改為允許換行) */
         .audio-panel { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
-        .radio-controls { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
-        .radio-btn { flex: 1; padding: 12px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; white-space: nowrap; font-size: 1em; transition: all 0.2s; font-weight: bold; }
+        .radio-controls { display: flex; flex-wrap: wrap; gap: 10px; padding-bottom: 5px; justify-content: center; }
+        .radio-btn { flex: 1; min-width: 90px; padding: 10px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.95em; transition: all 0.2s; font-weight: bold; text-align: center; }
         .radio-btn:active { transform: scale(0.95); }
         .radio-btn.active { background: #ff6b81; color: white; box-shadow: 0 2px 5px rgba(255,107,129,0.4); }
-        .btn-stop { background: #dcdde1; color: #333; flex: 0.5; }
+        .btn-stop { background: #dcdde1; color: #333; }
         
         /* 隱藏 YouTube 播放器實體 */
         #youtube-player { position: absolute; opacity: 0.01; width: 1px; height: 1px; pointer-events: none; }
@@ -101,16 +109,14 @@
             <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn">🎧 Lo-fi</button>
             <button onclick="changeRadio('wdpCxldrZNI', this)" class="radio-btn">🩰 Waltz</button>
         </div>
-        <!-- 載入 YouTube API，隱藏畫面 -->
+        <!-- 載入 YouTube API -->
         <div id="youtube-player"></div>
     </div>
 
-    <!-- YouTube Iframe API -->
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         let ytPlayer;
 
-        // 當 YouTube API 準備好時初始化
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('youtube-player', {
                 height: '1',
@@ -120,17 +126,14 @@
             });
         }
 
-        // 切換頻道並播放
         function changeRadio(videoId, btnElement) {
             if (ytPlayer && ytPlayer.loadVideoById) {
                 ytPlayer.loadVideoById(videoId);
             }
-            // 更新按鈕顏色
             document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
             btnElement.classList.add('active');
         }
 
-        // 暫停音樂
         function stopRadio() {
             if (ytPlayer && ytPlayer.pauseVideo) {
                 ytPlayer.pauseVideo();
@@ -249,13 +252,14 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 7. 交通消息 API (透過公開 Proxy 讀取 RTHK RSS)
+        // 7. 交通消息 API (轉換為更穩定的 Proxy 伺服器)
         async function fetchTraffic() {
             try {
-                const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://rthk.hk/rthk/news/rss/c_expressnews_tdtraffic.xml')}`);
-                const data = await res.json();
+                // 使用 codetabs 代理伺服器獲取 RTHK 原始 XML 數據
+                const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://rthk.hk/rthk/news/rss/c_expressnews_tdtraffic.xml')}`);
+                const text = await res.text();
                 const parser = new DOMParser();
-                const xml = parser.parseFromString(data.contents, "text/xml");
+                const xml = parser.parseFromString(text, "text/xml");
                 const items = xml.querySelectorAll("item");
 
                 if (items.length === 0) {
@@ -271,11 +275,12 @@
                 }
                 document.getElementById('traffic-data').innerHTML = html;
             } catch (e) {
+                console.error(e);
                 document.getElementById('traffic-data').innerHTML = '<div style="color: #999;">暫時無法讀取交通消息</div>';
             }
         }
         fetchTraffic();
-        setInterval(fetchTraffic, 300000); // 交通消息每 5 分鐘更新一次
+        setInterval(fetchTraffic, 300000); 
     </script>
 </body>
 </html>
