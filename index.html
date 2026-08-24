@@ -17,7 +17,14 @@
         .bus-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.3em; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold;}
         .eta { color: #2ed573; font-weight: bold; }
-        iframe { width: 100%; height: 120px; border-radius: 15px; border: none; }
+        
+        /* YouTube 播放器及按鈕樣式 */
+        .audio-panel { display: flex; flex-direction: column; gap: 10px; }
+        .radio-controls { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .radio-btn { flex: 1; padding: 8px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; white-space: nowrap; font-size: 0.9em; transition: all 0.2s; font-weight: 500; }
+        .radio-btn:active { transform: scale(0.95); }
+        .radio-btn.active { background: #ff6b81; color: white; font-weight: bold; box-shadow: 0 2px 5px rgba(255,107,129,0.4); }
+        iframe { width: 100%; height: 120px; border-radius: 15px; border: none; background: #222; }
     </style>
 </head>
 <body>
@@ -41,8 +48,17 @@
     </div>
 
     <div class="card audio-panel">
-        <!-- 轉用另一條著名且保證可嵌入的 Lofi Girl 24/7 直播 -->
-        <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1" allow="autoplay; encrypted-media"></iframe>
+        <!-- 電台選擇按鈕 -->
+        <div class="radio-controls">
+            <button onclick="changeRadio('jfKfPfyJRdk', this)" class="radio-btn active">🎧 Lofi</button>
+            <button onclick="changeRadio('4xDzrUhVKVA', this)" class="radio-btn">🌌 Synthwave</button>
+            <button onclick="changeRadio('5yx6BWlEVcU', this)" class="radio-btn">☕ Chillhop</button>
+            <button onclick="changeRadio('tgQeOEUaTqA', this)" class="radio-btn">🎷 Cafe BGM</button>
+            <!-- 若某個電台失效，只需更改引號內的 11 位字元 YouTube ID 即可 -->
+        </div>
+        
+        <!-- 播放器 -->
+        <iframe id="youtube-player" src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1" allow="autoplay; encrypted-media"></iframe>
     </div>
 
     <script>
@@ -55,7 +71,17 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. 天文台天氣 API (元朗公園)
+        // 2. 切換電台頻道功能
+        function changeRadio(videoId, btnElement) {
+            // 替換 iframe 網址
+            document.getElementById('youtube-player').src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+            
+            // 更新按鈕顏色狀態
+            document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+
+        // 3. 天文台天氣 API (元朗公園)
         async function fetchWeather() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
@@ -69,38 +95,26 @@
         fetchWeather();
         setInterval(fetchWeather, 600000); 
 
-        // 3. 九巴 API (全面加強防錯機制)
+        // 4. 九巴 API (防錯機制版)
         async function fetchBus() {
             try {
-                // 步驟一：獲取車站列表
                 const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
                 const stopData = await stopRes.json();
                 
-                // 防錯：如果API沒有回傳預期的車站陣列
-                if (!stopData || !stopData.data || !Array.isArray(stopData.data)) {
-                    throw new Error("車站數據結構異常");
-                }
-
+                if (!stopData || !stopData.data || !Array.isArray(stopData.data)) throw new Error("車站數據異常");
                 const targetStop = stopData.data.find(s => s.name_tc && s.name_tc.includes('形點'));
-                
-                if (!targetStop) {
-                    throw new Error("找不到形點 I 車站");
-                }
+                if (!targetStop) throw new Error("找不到車站");
 
-                // 步驟二：獲取 ETA
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${targetStop.stop}/269D/1`);
                 const etaData = await etaRes.json();
                 
-                // 防錯：過濾無效數據
                 const validEtas = (etaData.data || []).filter(eta => eta && eta.eta !== null && eta.eta !== "");
 
-                // 判斷是否無車
                 if (validEtas.length === 0) {
                     document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 尾班車已過 / 暫無班次</div>';
                     return;
                 }
 
-                // 顯示正常時間
                 const html = validEtas.slice(0, 2).map(eta => {
                     const minutes = Math.round((new Date(eta.eta) - new Date()) / 60000);
                     const timeStr = new Date(eta.eta).toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
@@ -109,8 +123,6 @@
                 document.getElementById('bus-data').innerHTML = html;
 
             } catch (e) { 
-                console.error("巴士 API 錯誤:", e);
-                // 即使出錯，在深夜時段我們也傾向顯示「暫無班次」而非「網絡錯誤」
                 document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 尾班車已過 / 暫無班次</div>';
             }
         }
