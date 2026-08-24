@@ -251,27 +251,23 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 7. 交通消息 API (改用運輸署 RSS 及穩定版 Raw Proxy)
+        // 7. 交通消息 API (改用 rss2json 專用 API 解析運輸署 RSS)
         async function fetchTraffic() {
             try {
-                // 使用 allorigins 的 raw 模式，直接獲取運輸署的 XML 數據
                 const tdUrl = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
-                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(tdUrl)}`);
-                const text = await res.text();
-                
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(text, "text/xml");
-                const items = xml.querySelectorAll("item");
+                // 透過 rss2json 轉換，100% 繞過 CORS 與政府防火牆
+                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(tdUrl)}`);
+                const data = await res.json();
 
-                if (items.length === 0) {
+                if (data.status !== 'ok' || !data.items || data.items.length === 0) {
                     document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
                     return;
                 }
 
                 let html = '';
                 // 顯示最新 2 條交通消息
-                for (let i = 0; i < Math.min(2, items.length); i++) {
-                    const title = items[i].querySelector("title").textContent;
+                for (let i = 0; i < Math.min(2, data.items.length); i++) {
+                    const title = data.items[i].title;
                     html += `<div class="traffic-item">🚗 ${title}</div>`;
                 }
                 document.getElementById('traffic-data').innerHTML = html;
