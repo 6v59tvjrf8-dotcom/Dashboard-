@@ -13,23 +13,20 @@
         #date { font-size: 1.5em; color: #ff6b81; font-weight: bold; }
         
         .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
-        .weather-panel, .bus-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* 天氣樣式 */
-        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; flex-shrink: 0; }
-        #weather-warnings { min-height: 25px; margin-bottom: 5px; flex-shrink: 0; }
+        /* 天氣樣式：改用 Block 防止疊字，加入整體捲動 */
+        .weather-panel { flex: 1; display: block; overflow-y: auto; }
+        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; }
+        #weather-warnings { min-height: 25px; margin-bottom: 5px; }
         .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.9em; font-weight: bold; margin-right: 5px; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
         
-        /* 天氣預測 (改良版：分開標題與捲動區) */
-        .forecast-container { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
-        .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; flex-shrink: 0; }
-        #forecast-desc { flex: 1; overflow-y: auto; font-size: 0.95em; color: #555; line-height: 1.5; padding-right: 5px; }
-        
-        /* 美化滾動條 */
-        #forecast-desc::-webkit-scrollbar { width: 5px; }
-        #forecast-desc::-webkit-scrollbar-thumb { background: #ccc; border-radius: 5px; }
+        /* 預測文字區塊 */
+        .forecast-container { margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
+        .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; }
+        #forecast-desc { font-size: 0.95em; color: #555; line-height: 1.5; }
         
         /* 巴士樣式 */
+        .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .bus-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.3em; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold;}
         .eta { color: #2ed573; font-weight: bold; }
@@ -52,12 +49,11 @@
 
     <div class="content">
         <div class="card weather-panel">
-            <h3 style="margin-top:0; flex-shrink: 0;">☀️ 元朗區實時天氣</h3>
+            <h3 style="margin-top:0;">☀️ 元朗區實時天氣</h3>
             <div id="weather-warnings"></div> 
             <div class="temp"><span id="temperature">--</span>°C</div>
-            <p style="margin: 0; flex-shrink: 0;">💧 相對濕度: <span id="humidity">--</span>%</p>
+            <p style="margin: 0;">💧 相對濕度: <span id="humidity">--</span>%</p>
             
-            <!-- 天氣預測獨立成靈活區塊 -->
             <div class="forecast-container">
                 <h4>📝 本港地區天氣預測</h4>
                 <div id="forecast-desc">載入中...</div>
@@ -77,7 +73,8 @@
             <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn">☕ 頻道 3</button>
             <button onclick="changeRadio('kgx4WGK0oNU', this)" class="radio-btn">🎷 頻道 4</button>
         </div>
-        <iframe id="youtube-player" src="https://www.youtube.com/embed/NVhl0tCzFTc?autoplay=1" allow="autoplay; encrypted-media"></iframe>
+        <!-- 移除了 autoplay=1，改為 playsinline=1，防止 iOS 阻擋播放變黑屏 -->
+        <iframe id="youtube-player" src="https://www.youtube.com/embed/NVhl0tCzFTc?playsinline=1" allow="autoplay; encrypted-media"></iframe>
     </div>
 
     <script>
@@ -90,9 +87,9 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. 切換電台
+        // 2. 切換電台 (移除 autoplay 以適應 iOS)
         function changeRadio(videoId, btnElement) {
-            document.getElementById('youtube-player').src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+            document.getElementById('youtube-player').src = `https://www.youtube.com/embed/${videoId}?playsinline=1`;
             document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
             btnElement.classList.add('active');
         }
@@ -145,32 +142,34 @@
         fetchWeather(); fetchForecast(); fetchWarnings();
         setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
 
-        // 6. 九巴 API (極限防錯，獲取所有 Service Type 並精準過濾)
+        // 6. 九巴 API (終極防錯：針對車站 ID 獲取所有班次)
         async function fetchBus() {
             try {
+                // 步驟一：獲取站點列表，精準配對 "形點 I"
                 const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
                 const stopData = await stopRes.json();
-                if (!stopData || !stopData.data || !Array.isArray(stopData.data)) throw new Error("車站數據異常");
+                if (!stopData || !stopData.data) throw new Error("車站數據異常");
                 
-                const targetStop = stopData.data.find(s => s.name_tc && s.name_tc.replace(/\s+/g, '').includes('形點'));
-                if (!targetStop) throw new Error("找不到車站");
+                // 嚴格配對名稱，避免誤中 "形點 II"
+                const targetStop = stopData.data.find(s => s.name_tc === '形點 I' || s.name_tc === '形點I');
+                if (!targetStop) throw new Error("搵唔到形點 I 個站");
 
-                // 取消咗 URL 尾段嘅 "/1"，令 API 返回所有常規及特別班次數據
-                const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${targetStop.stop}/269D`);
+                // 步驟二：直接查閱該「實體巴士站」的 ETA (無視常規/特別班次)
+                const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStop.stop}`);
                 const etaData = await etaRes.json();
                 
-                // 只過濾出 Outbound (O) 往瀝源方向，並且擁有有效時間嘅數據
-                const validEtas = (etaData.data || []).filter(eta => eta && eta.eta !== null && eta.eta !== "" && eta.dir === 'O');
+                // 篩選出 269D、往瀝源方向(O)、且有真實時間的班次
+                const validEtas = (etaData.data || []).filter(eta => eta.route === '269D' && eta.dir === 'O' && eta.eta !== null && eta.eta !== "");
                 
-                // 按時間先後排序，確保最快到嘅車排第一
+                // 根據時間先後排序
                 validEtas.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
                 if (validEtas.length === 0) {
-                    document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">暫無班次資料</div>';
+                    document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 尾班車已過 / 暫無班次</div>';
                     return;
                 }
 
-                const html = validEtas.slice(0, 2).map(eta => {
+                const html = validEtas.slice(0, 3).map(eta => {
                     const minutes = Math.round((new Date(eta.eta) - new Date()) / 60000);
                     const timeStr = new Date(eta.eta).toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
                     return `<div class="bus-item"><span class="bus-route">269D</span><span>形點 I</span><span class="eta">${minutes > 0 ? minutes + ' 分鐘' : '即將抵達'}</span><span style="font-size:0.6em; color:#666">${timeStr}</span></div>`;
@@ -179,7 +178,7 @@
 
             } catch (e) { 
                 console.error("Bus Error:", e);
-                document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">暫無班次資料</div>';
+                document.getElementById('bus-data').innerHTML = `<div style="color: #ff6b81; margin-top: 15px; font-weight: bold;">系統錯誤: ${e.message}</div>`;
             }
         }
         fetchBus();
