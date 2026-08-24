@@ -20,16 +20,21 @@
         #weather-warnings { min-height: 25px; margin-bottom: 5px; }
         .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.9em; font-weight: bold; margin-right: 5px; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
         
-        /* 預測文字區塊 */
         .forecast-container { margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
         .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; }
         #forecast-desc { font-size: 0.95em; color: #555; line-height: 1.5; }
         
-        /* 巴士樣式 */
+        /* 巴士樣式 (重新設計，防止文字疊位) */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .bus-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.3em; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
-        .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold;}
-        .eta { color: #2ed573; font-weight: bold; }
+        .bus-item { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
+        
+        .bus-info { display: flex; align-items: center; gap: 10px; }
+        .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold; font-size: 1.1em; white-space: nowrap; }
+        .bus-station { font-size: 1.1em; font-weight: 500; white-space: nowrap; color: #333; }
+        
+        .bus-time { display: flex; flex-direction: column; align-items: flex-end; min-width: 80px; }
+        .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; white-space: nowrap; }
+        .eta-exact { font-size: 0.85em; color: #888; white-space: nowrap; margin-top: 2px; }
         
         /* YouTube 播放器及按鈕樣式 */
         .audio-panel { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
@@ -61,7 +66,7 @@
         </div>
 
         <div class="card bus-panel">
-            <h3 style="margin-top:0;">🚌 269D 往瀝源 (形點 I)</h3>
+            <h3 style="margin-top:0;">🚌 269D 往瀝源</h3>
             <div id="bus-data">載入中...</div>
         </div>
     </div>
@@ -141,10 +146,9 @@
         fetchWeather(); fetchForecast(); fetchWarnings();
         setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
 
-        // 6. 九巴 API (終極無死角：雙向搜尋 + 截圖數據保底)
+        // 6. 九巴 API (加入排版美化及自動剔除重複班次)
         async function fetchBus() {
             try {
-                // 步驟一：同時索取 Inbound 同 Outbound，無視九巴嘅方向分類
                 const [outRes, inRes] = await Promise.all([
                     fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1'),
                     fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/inbound/1')
@@ -155,42 +159,61 @@
                 
                 if (allStops.length === 0) throw new Error("讀取唔到路線數據");
                 
-                // 步驟二：搵「形點 I」
                 let targetStop = allStops.find(s => {
                     const name = (s.name_tc || "") + (s.name_en || "");
                     return (name.includes('形點') || name.includes('YOHO')) && !name.includes('II') && !name.includes('2');
                 });
                 
-                // 步驟三：【終極保底】如果文字配對失敗，根據你提供嘅截圖直接抽「第 18 個站」！
                 if (!targetStop) {
                     targetStop = allStops.find(s => String(s.seq) === '18');
                 }
                 
                 if (!targetStop) throw new Error("搵唔到形點 I 個站");
 
-                // 步驟四：獲取該實體站嘅所有 ETA (涵蓋所有 Service Type)
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStop.stop}`);
                 const etaData = await etaRes.json();
                 
-                // 步驟五：認住目的地「瀝源」，絕對唔會捉錯對面線嘅車！
-                const validEtas = (etaData.data || []).filter(eta => 
+                let validEtas = (etaData.data || []).filter(eta => 
                     eta.route === '269D' && 
                     eta.eta !== null && 
                     eta.eta !== "" && 
-                    (eta.dest_tc && eta.dest_tc.includes('瀝')) // 只要目的地有「瀝」字就一定啱
+                    (eta.dest_tc && eta.dest_tc.includes('瀝'))
                 );
                 
                 validEtas.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                if (validEtas.length === 0) {
+                // 【關鍵修正】過濾重複時間的班次 (去重處理)
+                const uniqueEtas = [];
+                const seenTimes = new Set();
+                for (const eta of validEtas) {
+                    if (!seenTimes.has(eta.eta)) {
+                        seenTimes.add(eta.eta);
+                        uniqueEtas.push(eta);
+                    }
+                }
+
+                if (uniqueEtas.length === 0) {
                     document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 暫無班次資料</div>';
                     return;
                 }
 
-                const html = validEtas.slice(0, 3).map(eta => {
+                // 【排版修正】將路線、站名歸做一組；將倒數分鐘、實際時間歸做另一組，防止互擠
+                const html = uniqueEtas.slice(0, 3).map(eta => {
                     const minutes = Math.round((new Date(eta.eta) - new Date()) / 60000);
                     const timeStr = new Date(eta.eta).toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
-                    return `<div class="bus-item"><span class="bus-route">269D</span><span>形點 I</span><span class="eta">${minutes > 0 ? minutes + ' 分鐘' : '即將抵達'}</span><span style="font-size:0.6em; color:#666">${timeStr}</span></div>`;
+                    
+                    return `
+                        <div class="bus-item">
+                            <div class="bus-info">
+                                <span class="bus-route">269D</span>
+                                <span class="bus-station">形點 I</span>
+                            </div>
+                            <div class="bus-time">
+                                <span class="eta">${minutes > 0 ? minutes + ' 分鐘' : '即將抵達'}</span>
+                                <span class="eta-exact">${timeStr}</span>
+                            </div>
+                        </div>
+                    `;
                 }).join('');
                 document.getElementById('bus-data').innerHTML = html;
 
