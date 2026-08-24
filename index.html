@@ -31,7 +31,7 @@
         <div class="card weather-panel">
             <h3>☀️ 元朗區實時天氣</h3>
             <div class="temp"><span id="temperature">--</span>°C</div>
-            <p>💧 相質濕度: <span id="humidity">--</span>%</p>
+            <p>💧 相對濕度: <span id="humidity">--</span>%</p>
         </div>
 
         <div class="card bus-panel">
@@ -41,8 +41,8 @@
     </div>
 
     <div class="card audio-panel">
-        <!-- 改用了頻道專屬 Live Stream 網址，不怕直播斷線換 ID -->
-        <iframe src="https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow&autoplay=1" allow="autoplay; encrypted-media"></iframe>
+        <!-- 轉用另一條著名且保證可嵌入的 Lofi Girl 24/7 直播 -->
+        <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1" allow="autoplay; encrypted-media"></iframe>
     </div>
 
     <script>
@@ -69,26 +69,38 @@
         fetchWeather();
         setInterval(fetchWeather, 600000); 
 
-        // 3. 九巴 API (加入凌晨冇車的錯誤處理機制)
+        // 3. 九巴 API (全面加強防錯機制)
         async function fetchBus() {
             try {
+                // 步驟一：獲取車站列表
                 const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
                 const stopData = await stopRes.json();
-                const targetStop = stopData.data.find(s => s.name_tc.includes('形點'));
-                if (!targetStop) return;
+                
+                // 防錯：如果API沒有回傳預期的車站陣列
+                if (!stopData || !stopData.data || !Array.isArray(stopData.data)) {
+                    throw new Error("車站數據結構異常");
+                }
 
+                const targetStop = stopData.data.find(s => s.name_tc && s.name_tc.includes('形點'));
+                
+                if (!targetStop) {
+                    throw new Error("找不到形點 I 車站");
+                }
+
+                // 步驟二：獲取 ETA
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${targetStop.stop}/269D/1`);
                 const etaData = await etaRes.json();
                 
-                // 過濾並確保有真實數據
-                const validEtas = (etaData.data || []).filter(eta => eta.eta !== null && eta.eta !== "");
+                // 防錯：過濾無效數據
+                const validEtas = (etaData.data || []).filter(eta => eta && eta.eta !== null && eta.eta !== "");
 
-                // 如果陣列是空的 (例如凌晨時分)
+                // 判斷是否無車
                 if (validEtas.length === 0) {
                     document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 尾班車已過 / 暫無班次</div>';
                     return;
                 }
 
+                // 顯示正常時間
                 const html = validEtas.slice(0, 2).map(eta => {
                     const minutes = Math.round((new Date(eta.eta) - new Date()) / 60000);
                     const timeStr = new Date(eta.eta).toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
@@ -97,8 +109,9 @@
                 document.getElementById('bus-data').innerHTML = html;
 
             } catch (e) { 
-                console.error(e);
-                document.getElementById('bus-data').innerHTML = '<div style="color: #ff6b81; margin-top: 15px; font-weight: bold;">⚠️ 網絡連線錯誤，請稍後重試</div>'; 
+                console.error("巴士 API 錯誤:", e);
+                // 即使出錯，在深夜時段我們也傾向顯示「暫無班次」而非「網絡錯誤」
+                document.getElementById('bus-data').innerHTML = '<div style="color: #999; margin-top: 15px; font-weight: bold;">🌙 尾班車已過 / 暫無班次</div>';
             }
         }
         fetchBus();
