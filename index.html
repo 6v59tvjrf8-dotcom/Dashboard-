@@ -13,7 +13,6 @@
         #date { font-size: 1.5em; color: #ff6b81; font-weight: bold; }
         
         .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
-        /* 針對較窄螢幕，允許左右兩欄自動變成上下排 (若空間不足) */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
             body { height: auto; min-height: 100vh; overflow: auto; }
@@ -35,7 +34,7 @@
             .right-column { overflow: visible; }
         }
         
-        /* 巴士樣式 (加強自動換行與防斷字) */
+        /* 巴士樣式 */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
         .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex: 1; min-width: 120px; }
@@ -50,7 +49,7 @@
         .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
         .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
-        /* 音樂按鈕樣式 (改為允許換行) */
+        /* 音樂按鈕樣式 */
         .audio-panel { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
         .radio-controls { display: flex; flex-wrap: wrap; gap: 10px; padding-bottom: 5px; justify-content: center; }
         .radio-btn { flex: 1; min-width: 90px; padding: 10px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.95em; transition: all 0.2s; font-weight: bold; text-align: center; }
@@ -252,12 +251,14 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 7. 交通消息 API (轉換為更穩定的 Proxy 伺服器)
+        // 7. 交通消息 API (改用運輸署 RSS 及穩定版 Raw Proxy)
         async function fetchTraffic() {
             try {
-                // 使用 codetabs 代理伺服器獲取 RTHK 原始 XML 數據
-                const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://rthk.hk/rthk/news/rss/c_expressnews_tdtraffic.xml')}`);
+                // 使用 allorigins 的 raw 模式，直接獲取運輸署的 XML 數據
+                const tdUrl = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
+                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(tdUrl)}`);
                 const text = await res.text();
+                
                 const parser = new DOMParser();
                 const xml = parser.parseFromString(text, "text/xml");
                 const items = xml.querySelectorAll("item");
@@ -275,7 +276,7 @@
                 }
                 document.getElementById('traffic-data').innerHTML = html;
             } catch (e) {
-                console.error(e);
+                console.error("Traffic Error:", e);
                 document.getElementById('traffic-data').innerHTML = '<div style="color: #999;">暫時無法讀取交通消息</div>';
             }
         }
