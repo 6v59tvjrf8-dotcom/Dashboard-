@@ -14,7 +14,7 @@
         
         .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
         
-        /* 天氣樣式：改用 Block 防止疊字，加入整體捲動 */
+        /* 天氣樣式 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
         .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; }
         #weather-warnings { min-height: 25px; margin-bottom: 5px; }
@@ -73,7 +73,6 @@
             <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn">☕ 頻道 3</button>
             <button onclick="changeRadio('kgx4WGK0oNU', this)" class="radio-btn">🎷 頻道 4</button>
         </div>
-        <!-- 移除了 autoplay=1，改為 playsinline=1，防止 iOS 阻擋播放變黑屏 -->
         <iframe id="youtube-player" src="https://www.youtube.com/embed/NVhl0tCzFTc?playsinline=1" allow="autoplay; encrypted-media"></iframe>
     </div>
 
@@ -87,7 +86,7 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. 切換電台 (移除 autoplay 以適應 iOS)
+        // 2. 切換電台
         function changeRadio(videoId, btnElement) {
             document.getElementById('youtube-player').src = `https://www.youtube.com/embed/${videoId}?playsinline=1`;
             document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
@@ -142,26 +141,25 @@
         fetchWeather(); fetchForecast(); fetchWarnings();
         setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
 
-        // 6. 九巴 API (終極防錯：針對車站 ID 獲取所有班次)
+        // 6. 九巴 API (終極名字匹配防錯)
         async function fetchBus() {
             try {
-                // 步驟一：獲取站點列表，精準配對 "形點 I"
                 const stopRes = await fetch('https://data.etabus.gov.hk/v1/transport/kmb/route-stop/269D/outbound/1');
                 const stopData = await stopRes.json();
                 if (!stopData || !stopData.data) throw new Error("車站數據異常");
                 
-                // 嚴格配對名稱，避免誤中 "形點 II"
-                const targetStop = stopData.data.find(s => s.name_tc === '形點 I' || s.name_tc === '形點I');
+                // 【關鍵修正】包含「形點」，但排除「II」，無視所有空格符號
+                const targetStop = stopData.data.find(s => {
+                    const name = s.name_tc || "";
+                    return name.includes('形點') && !name.includes('II');
+                });
+                
                 if (!targetStop) throw new Error("搵唔到形點 I 個站");
 
-                // 步驟二：直接查閱該「實體巴士站」的 ETA (無視常規/特別班次)
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStop.stop}`);
                 const etaData = await etaRes.json();
                 
-                // 篩選出 269D、往瀝源方向(O)、且有真實時間的班次
                 const validEtas = (etaData.data || []).filter(eta => eta.route === '269D' && eta.dir === 'O' && eta.eta !== null && eta.eta !== "");
-                
-                // 根據時間先後排序
                 validEtas.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
                 if (validEtas.length === 0) {
