@@ -24,25 +24,34 @@
         .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; }
         #forecast-desc { font-size: 0.95em; color: #555; line-height: 1.5; }
         
-        /* 巴士樣式 (重新設計，防止文字疊位) */
+        /* 右側欄：包含巴士與交通 */
+        .right-column { flex: 1; display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
+        
+        /* 巴士樣式 */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .bus-item { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
-        
         .bus-info { display: flex; align-items: center; gap: 10px; }
         .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold; font-size: 1.1em; white-space: nowrap; }
         .bus-station { font-size: 1.1em; font-weight: 500; white-space: nowrap; color: #333; }
-        
         .bus-time { display: flex; flex-direction: column; align-items: flex-end; min-width: 80px; }
         .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; white-space: nowrap; }
         .eta-exact { font-size: 0.85em; color: #888; white-space: nowrap; margin-top: 2px; }
         
-        /* YouTube 播放器及按鈕樣式 */
+        /* 交通消息樣式 */
+        .traffic-panel { display: flex; flex-direction: column; overflow-y: auto; max-height: 25%; }
+        .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
+        .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+        /* 音樂按鈕樣式 (畫面已隱藏) */
         .audio-panel { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
         .radio-controls { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
-        .radio-btn { flex: 1; padding: 8px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; white-space: nowrap; font-size: 0.9em; transition: all 0.2s; font-weight: 500; }
+        .radio-btn { flex: 1; padding: 12px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; white-space: nowrap; font-size: 1em; transition: all 0.2s; font-weight: bold; }
         .radio-btn:active { transform: scale(0.95); }
-        .radio-btn.active { background: #ff6b81; color: white; font-weight: bold; box-shadow: 0 2px 5px rgba(255,107,129,0.4); }
-        iframe { width: 100%; height: 120px; border-radius: 15px; border: none; background: #222; }
+        .radio-btn.active { background: #ff6b81; color: white; box-shadow: 0 2px 5px rgba(255,107,129,0.4); }
+        .btn-stop { background: #dcdde1; color: #333; flex: 0.5; }
+        
+        /* 隱藏 YouTube 播放器實體 */
+        #youtube-player { position: absolute; opacity: 0.01; width: 1px; height: 1px; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -53,6 +62,7 @@
     </div>
 
     <div class="content">
+        <!-- 左側：天氣 -->
         <div class="card weather-panel">
             <h3 style="margin-top:0;">☀️ 元朗區實時天氣</h3>
             <div id="weather-warnings"></div> 
@@ -65,23 +75,70 @@
             </div>
         </div>
 
-        <div class="card bus-panel">
-            <h3 style="margin-top:0;">🚌 269D 往瀝源</h3>
-            <div id="bus-data">載入中...</div>
+        <!-- 右側：巴士 + 交通 -->
+        <div class="right-column">
+            <div class="card bus-panel">
+                <h3 style="margin-top:0;">🚌 269D 往瀝源</h3>
+                <div id="bus-data">載入中...</div>
+            </div>
+            
+            <div class="card traffic-panel">
+                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">🚦 最新交通消息</h3>
+                <div id="traffic-data">載入中...</div>
+            </div>
         </div>
     </div>
 
+    <!-- 底部：純音樂控制台 -->
     <div class="card audio-panel">
         <div class="radio-controls">
-            <button onclick="changeRadio('NVhl0tCzFTc', this)" class="radio-btn active">✝️ Worship Acoustic</button>
-            <button onclick="changeRadio('OlrHsQ9QexE', this)" class="radio-btn">☕️ Cafe Jazz</button>
-            <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn">🎧 Morning Lo-fi</button>
-            <button onclick="changeRadio('wdpCxldrZNI', this)" class="radio-btn">🩰 Princess Waltz</button>
+            <!-- 暫停按鈕 -->
+            <button onclick="stopRadio()" class="radio-btn btn-stop" id="stop-btn">⏸️ 暫停</button>
+            
+            <!-- 電台按鈕 -->
+            <button onclick="changeRadio('NVhl0tCzFTc', this)" class="radio-btn">✝️ Worship</button>
+            <button onclick="changeRadio('OlrHsQ9QexE', this)" class="radio-btn">☕️ Cafe</button>
+            <button onclick="changeRadio('rO3e5Ws94NA', this)" class="radio-btn">🎧 Lo-fi</button>
+            <button onclick="changeRadio('wdpCxldrZNI', this)" class="radio-btn">🩰 Waltz</button>
         </div>
-        <iframe id="youtube-player" src="https://www.youtube.com/embed/NVhl0tCzFTc?playsinline=1" allow="autoplay; encrypted-media"></iframe>
+        <!-- 載入 YouTube API，隱藏畫面 -->
+        <div id="youtube-player"></div>
     </div>
 
+    <!-- YouTube Iframe API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
+        let ytPlayer;
+
+        // 當 YouTube API 準備好時初始化
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('youtube-player', {
+                height: '1',
+                width: '1',
+                videoId: '', 
+                playerVars: { 'playsinline': 1, 'controls': 0 }
+            });
+        }
+
+        // 切換頻道並播放
+        function changeRadio(videoId, btnElement) {
+            if (ytPlayer && ytPlayer.loadVideoById) {
+                ytPlayer.loadVideoById(videoId);
+            }
+            // 更新按鈕顏色
+            document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+
+        // 暫停音樂
+        function stopRadio() {
+            if (ytPlayer && ytPlayer.pauseVideo) {
+                ytPlayer.pauseVideo();
+            }
+            document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('stop-btn').classList.add('active');
+        }
+
         // 1. 實時時鐘
         function updateClock() {
             const now = new Date();
@@ -90,13 +147,6 @@
         }
         setInterval(updateClock, 1000);
         updateClock();
-
-        // 2. 切換電台
-        function changeRadio(videoId, btnElement) {
-            document.getElementById('youtube-player').src = `https://www.youtube.com/embed/${videoId}?playsinline=1`;
-            document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
-            btnElement.classList.add('active');
-        }
 
         // 3. 天文台天氣 API
         async function fetchWeather() {
@@ -116,9 +166,7 @@
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc');
                 const data = await res.json();
                 document.getElementById('forecast-desc').innerText = data.forecastDesc;
-            } catch (e) { 
-                document.getElementById('forecast-desc').innerText = '預測載入失敗，請稍後重試。'; 
-            }
+            } catch (e) { document.getElementById('forecast-desc').innerText = '預測載入失敗'; }
         }
 
         // 5. 天文台警告 API
@@ -127,17 +175,10 @@
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc');
                 const data = await res.json();
                 const warningContainer = document.getElementById('weather-warnings');
-                
-                if (Object.keys(data).length === 0) {
-                    warningContainer.innerHTML = '';
-                    return;
-                }
-
+                if (Object.keys(data).length === 0) { warningContainer.innerHTML = ''; return; }
                 let warningHtml = '';
                 for (const key in data) {
-                    if (data[key].name) {
-                        warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`;
-                    }
+                    if (data[key].name) { warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`; }
                 }
                 warningContainer.innerHTML = warningHtml;
             } catch (e) { console.error('警告載入失敗'); }
@@ -146,7 +187,7 @@
         fetchWeather(); fetchForecast(); fetchWarnings();
         setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
 
-        // 6. 九巴 API (加入排版美化及自動剔除重複班次)
+        // 6. 九巴 API 
         async function fetchBus() {
             try {
                 const [outRes, inRes] = await Promise.all([
@@ -157,39 +198,25 @@
                 const inData = await inRes.json();
                 const allStops = [...(outData.data || []), ...(inData.data || [])];
                 
-                if (allStops.length === 0) throw new Error("讀取唔到路線數據");
-                
                 let targetStop = allStops.find(s => {
                     const name = (s.name_tc || "") + (s.name_en || "");
                     return (name.includes('形點') || name.includes('YOHO')) && !name.includes('II') && !name.includes('2');
                 });
-                
-                if (!targetStop) {
-                    targetStop = allStops.find(s => String(s.seq) === '18');
-                }
-                
-                if (!targetStop) throw new Error("搵唔到形點 I 個站");
+                if (!targetStop) { targetStop = allStops.find(s => String(s.seq) === '18'); }
+                if (!targetStop) throw new Error("搵唔到車站");
 
                 const etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStop.stop}`);
                 const etaData = await etaRes.json();
                 
                 let validEtas = (etaData.data || []).filter(eta => 
-                    eta.route === '269D' && 
-                    eta.eta !== null && 
-                    eta.eta !== "" && 
-                    (eta.dest_tc && eta.dest_tc.includes('瀝'))
+                    eta.route === '269D' && eta.eta !== null && eta.eta !== "" && (eta.dest_tc && eta.dest_tc.includes('瀝'))
                 );
-                
                 validEtas.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                // 【關鍵修正】過濾重複時間的班次 (去重處理)
                 const uniqueEtas = [];
                 const seenTimes = new Set();
                 for (const eta of validEtas) {
-                    if (!seenTimes.has(eta.eta)) {
-                        seenTimes.add(eta.eta);
-                        uniqueEtas.push(eta);
-                    }
+                    if (!seenTimes.has(eta.eta)) { seenTimes.add(eta.eta); uniqueEtas.push(eta); }
                 }
 
                 if (uniqueEtas.length === 0) {
@@ -197,11 +224,9 @@
                     return;
                 }
 
-                // 【排版修正】將路線、站名歸做一組；將倒數分鐘、實際時間歸做另一組，防止互擠
                 const html = uniqueEtas.slice(0, 3).map(eta => {
                     const minutes = Math.round((new Date(eta.eta) - new Date()) / 60000);
                     const timeStr = new Date(eta.eta).toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
-                    
                     return `
                         <div class="bus-item">
                             <div class="bus-info">
@@ -218,12 +243,39 @@
                 document.getElementById('bus-data').innerHTML = html;
 
             } catch (e) { 
-                console.error("Bus Error:", e);
-                document.getElementById('bus-data').innerHTML = `<div style="color: #ff6b81; margin-top: 15px; font-weight: bold; font-size: 0.9em;">⚠️ 系統錯誤: ${e.message}</div>`;
+                document.getElementById('bus-data').innerHTML = `<div style="color: #ff6b81; margin-top: 15px; font-weight: bold; font-size: 0.9em;">⚠️ 系統錯誤</div>`;
             }
         }
         fetchBus();
         setInterval(fetchBus, 60000);
+
+        // 7. 交通消息 API (透過公開 Proxy 讀取 RTHK RSS)
+        async function fetchTraffic() {
+            try {
+                const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://rthk.hk/rthk/news/rss/c_expressnews_tdtraffic.xml')}`);
+                const data = await res.json();
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(data.contents, "text/xml");
+                const items = xml.querySelectorAll("item");
+
+                if (items.length === 0) {
+                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+                    return;
+                }
+
+                let html = '';
+                // 顯示最新 2 條交通消息
+                for (let i = 0; i < Math.min(2, items.length); i++) {
+                    const title = items[i].querySelector("title").textContent;
+                    html += `<div class="traffic-item">🚗 ${title}</div>`;
+                }
+                document.getElementById('traffic-data').innerHTML = html;
+            } catch (e) {
+                document.getElementById('traffic-data').innerHTML = '<div style="color: #999;">暫時無法讀取交通消息</div>';
+            }
+        }
+        fetchTraffic();
+        setInterval(fetchTraffic, 300000); // 交通消息每 5 分鐘更新一次
     </script>
 </body>
 </html>
