@@ -48,10 +48,13 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; }
         .eta-exact { font-size: 0.85em; color: #888; margin-top: 2px; }
         
-        /* 交通消息樣式 (改為 iframe 滿版顯示) */
-        .traffic-panel { display: flex; flex-direction: column; flex: 1; min-height: 220px; padding: 15px; }
-        .iframe-container { flex: 1; border-radius: 10px; overflow: hidden; border: 1px solid #eee; background: #f9f9f9; position: relative; }
-        
+        /* 交通消息樣式 */
+        .traffic-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; max-height: 35%; }
+        .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
+        .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .traffic-link-btn { display: block; text-align: center; margin-top: 10px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.95em; transition: all 0.2s; }
+        .traffic-link-btn:active { background: #eccc68; color: white; }
+
         /* 聖經金句區塊 */
         .bible-panel { padding: 15px 20px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
@@ -95,12 +98,13 @@
                 <div id="bus-data">載入中...</div>
             </div>
             
-            <!-- 交通消息直嵌網頁區塊 -->
             <div class="card traffic-panel">
-                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43; margin-bottom: 10px;">📻 港台即時交通消息</h3>
-                <div class="iframe-container">
-                    <iframe src="https://programme.rthk.hk/channel/radio/trafficnews/index.php" style="width: 100%; height: 100%; border: none;"></iframe>
+                <div>
+                    <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">📻 港台交通摘要</h3>
+                    <div id="traffic-data">載入中...</div>
                 </div>
+                <!-- 終極解決方案：提供一鍵直達網頁按鈕 -->
+                <a href="https://programme.rthk.hk/channel/radio/trafficnews/index.php" target="_blank" class="traffic-link-btn">🔗 點擊查看完整港台交通網頁</a>
             </div>
         </div>
     </div>
@@ -330,6 +334,46 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
+        // 8. 交通消息 API (最穩定寫法：取消破緩存避免 Ban IP，配合一鍵直達按鈕)
+        async function fetchTraffic() {
+            try {
+                const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
+                
+                // 使用最單純的 rss2json 企業級轉換器，不添加任何可能觸發防禦的亂數
+                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
+                const data = await res.json();
+
+                if (data.status !== 'ok' || !data.items) {
+                    throw new Error("數據載入失敗");
+                }
+
+                let html = '';
+                let validCount = 0;
+
+                for (let i = 0; i < data.items.length; i++) {
+                    const title = data.items[i].title.trim();
+                    if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
+
+                    html += `<div class="traffic-item">🚗 ${title}</div>`;
+                    validCount++;
+                    if (validCount >= 2) break; // 顯示 2 條突發摘要
+                }
+
+                if (validCount === 0) {
+                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+                } else {
+                    document.getElementById('traffic-data').innerHTML = html;
+                }
+
+            } catch (e) {
+                // 如果 API 真的連不上，顯示一個溫和的提示，引導用戶按下面的按鈕
+                document.getElementById('traffic-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入摘要失敗，請點擊下方按鈕直接查看。</div>';
+            }
+        }
+        
+        fetchTraffic();
+        // 降低更新頻率至每 5 分鐘，確保 IP 安全
+        setInterval(fetchTraffic, 300000); 
     </script>
 </body>
 </html>
