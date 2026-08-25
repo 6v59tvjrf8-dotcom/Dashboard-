@@ -127,6 +127,7 @@
     <script>
         let ytPlayer;
 
+        // YouTube 播放器設定
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('youtube-player', {
                 height: '1', width: '1', videoId: '', 
@@ -153,7 +154,7 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. 每日聖經金句 (精選 52 句)
+        // 2. 每日聖經金句 (擴充庫)
         function updateBibleVerse() {
             const verses = [
                 "「當將你的事交託耶和華，並倚靠他，他就必成全。」(詩篇 37:5)",
@@ -213,17 +214,19 @@
             const now = new Date();
             const start = new Date(now.getFullYear(), 0, 0);
             const diff = now - start;
-            // 計算今天是今年的第幾天
+            // 透過公式根據一年中的日數，隨機且穩定地抽出金句
             const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
-            // 自動循環抽取金句
-            document.getElementById('bible-verse').innerText = verses[dayOfYear % verses.length];
+            // 使用質數 7 進行隨機化洗牌，確保每日不同
+            const index = (dayOfYear * 7) % verses.length;
+            document.getElementById('bible-verse').innerText = verses[index];
         }
         updateBibleVerse();
 
-        // 3. 政府 1823 公眾假期 API
+        // 3. 政府 1823 公眾假期 API (已修復為最新官方網址)
         async function fetchHoliday() {
             try {
-                const res = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://vcal.1823.gov.hk/res/vcal/tc.json'));
+                // 使用最新官方 tc.json 檔案
+                const res = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.1823.gov.hk/common/ical/tc.json'));
                 const data = await res.json();
                 const events = data.vcalendar[0].vevent;
                 
@@ -233,7 +236,8 @@
                 let holidayName = "";
                 
                 for (let i = 0; i < events.length; i++) {
-                    const dateStr = events[i].dtstart[0]; // 格式: YYYYMMDD
+                    const dateStr = events[i].dtstart[0]; 
+                    // 格式: YYYYMMDD
                     const hDate = new Date(dateStr.substring(0,4), parseInt(dateStr.substring(4,6))-1, dateStr.substring(6,8));
                     
                     if (hDate.getTime() === today.getTime()) {
@@ -251,7 +255,8 @@
                     document.getElementById('holiday-countdown').innerHTML = `🏖️ 仲有 <b>${diffDays}</b> 日就放假啦！(${holidayName})`;
                 }
             } catch (e) {
-                document.getElementById('holiday-countdown').style.display = 'none';
+                console.error("Holiday API Error:", e);
+                document.getElementById('holiday-countdown').innerHTML = '🏖️ 暫無假期資訊';
             }
         }
         fetchHoliday();
