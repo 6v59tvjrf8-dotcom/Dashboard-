@@ -9,17 +9,19 @@
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* 頂部時間及日期樣式 */
-        .header { display: flex; align-items: baseline; gap: 15px; color: #007aff; flex-shrink: 0; flex-wrap: wrap; }
-        #time { font-size: 3em; font-weight: bold; }
-        .date-section { display: flex; flex-direction: column; justify-content: center; }
-        #date { font-size: 1.5em; color: #ff6b81; font-weight: bold; margin-bottom: 3px; }
-        #holiday-countdown { font-size: 0.9em; color: #ff9f43; font-weight: bold; background: #fff3e0; padding: 4px 10px; border-radius: 8px; display: inline-block; border: 1px solid #ffeaa7; }
+        /* 頂部時間及日期樣式 (全新左右分區設計) */
+        .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
+        .time-section { color: #007aff; }
+        #time { font-size: 2.8em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
+        .date-section { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+        #date { font-size: 1.3em; color: #ff6b81; font-weight: bold; margin-bottom: 6px; line-height: 1; }
+        #holiday-countdown { font-size: 0.85em; color: #ff9f43; font-weight: bold; background: #fff3e0; padding: 5px 10px; border-radius: 8px; border: 1px solid #ffeaa7; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
         .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
             body { height: auto; min-height: 100vh; overflow: auto; }
+            #time { font-size: 2.4em; } /* 手機版稍為縮細時間字體防止逼爆 */
         }
         
         /* 天氣樣式 */
@@ -72,7 +74,9 @@
 <body>
 
     <div class="card header">
-        <div id="time">載入中...</div>
+        <div class="time-section">
+            <div id="time">載入中...</div>
+        </div>
         <div class="date-section">
             <div id="date"></div>
             <div id="holiday-countdown">計算假期中...</div>
@@ -103,7 +107,6 @@
                     <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">📻 港台交通摘要</h3>
                     <div id="traffic-data">載入中...</div>
                 </div>
-                <!-- 終極解決方案：提供一鍵直達網頁按鈕 -->
                 <a href="https://programme.rthk.hk/channel/radio/trafficnews/index.php" target="_blank" class="traffic-link-btn">🔗 點擊查看完整港台交通網頁</a>
             </div>
         </div>
@@ -334,12 +337,10 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (最穩定寫法：取消破緩存避免 Ban IP，配合一鍵直達按鈕)
+        // 8. 交通消息 API 
         async function fetchTraffic() {
             try {
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
-                
-                // 使用最單純的 rss2json 企業級轉換器，不添加任何可能觸發防禦的亂數
                 const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
                 const data = await res.json();
 
@@ -356,7 +357,7 @@
 
                     html += `<div class="traffic-item">🚗 ${title}</div>`;
                     validCount++;
-                    if (validCount >= 2) break; // 顯示 2 條突發摘要
+                    if (validCount >= 2) break;
                 }
 
                 if (validCount === 0) {
@@ -366,13 +367,11 @@
                 }
 
             } catch (e) {
-                // 如果 API 真的連不上，顯示一個溫和的提示，引導用戶按下面的按鈕
                 document.getElementById('traffic-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入摘要失敗，請點擊下方按鈕直接查看。</div>';
             }
         }
         
         fetchTraffic();
-        // 降低更新頻率至每 5 分鐘，確保 IP 安全
         setInterval(fetchTraffic, 300000); 
     </script>
 </body>
