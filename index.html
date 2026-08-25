@@ -182,32 +182,35 @@
         }
         updateBibleVerse();
 
-        // 3. 政府 1823 公眾假期 API (雙重保險版)
+        // 3. 政府 1823 公眾假期 API (終極雙重保險)
         async function fetchHoliday() {
             try {
-                const url = 'https://vcal.1823.gov.hk/res/vcal/tc.json';
-                let data;
+                // 正確嘅政府開放數據 JSON 網址
+                const url = 'https://www.1823.gov.hk/common/ical/tc.json';
+                let data = null;
                 
                 try {
-                    // 嘗試直接讀取
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error("Direct fetch failed");
-                    data = await res.json();
-                } catch (err) {
-                    // 失敗則自動切換使用穩定 Proxy
-                    const proxyRes = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`);
-                    data = await proxyRes.json();
+                    // 首選：使用 allorigins raw 讀取
+                    const res1 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+                    if (!res1.ok) throw new Error("Proxy 1 Failed");
+                    data = await res1.json();
+                } catch (err1) {
+                    // 備用：若首選失敗，自動切換至 codetabs proxy
+                    console.log("切換後備線路...");
+                    const res2 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`);
+                    if (!res2.ok) throw new Error("Proxy 2 Failed");
+                    data = await res2.json();
                 }
 
                 if (!data || !data.vcalendar || !data.vcalendar[0].vevent) {
-                    throw new Error("Invalid holiday data format");
+                    throw new Error("格式錯誤");
                 }
 
                 const events = data.vcalendar[0].vevent;
                 const today = new Date();
                 today.setHours(0,0,0,0);
                 
-                // 確保日期按先後排序
+                // 確保假期由近至遠排序，防止政府檔案亂序
                 events.sort((a, b) => parseInt(a.dtstart[0]) - parseInt(b.dtstart[0]));
                 
                 let nextHoliday = null;
@@ -215,7 +218,13 @@
                 
                 for (let i = 0; i < events.length; i++) {
                     const dateStr = events[i].dtstart[0]; 
-                    const hDate = new Date(dateStr.substring(0,4), parseInt(dateStr.substring(4,6))-1, dateStr.substring(6,8));
+                    if (!dateStr || dateStr.length < 8) continue;
+
+                    const hDate = new Date(
+                        parseInt(dateStr.substring(0,4)), 
+                        parseInt(dateStr.substring(4,6)) - 1, 
+                        parseInt(dateStr.substring(6,8))
+                    );
                     
                     if (hDate.getTime() === today.getTime()) {
                         document.getElementById('holiday-countdown').innerHTML = `🎉 今日放假啦！(${events[i].summary})`;
@@ -228,7 +237,8 @@
                 }
                 
                 if (nextHoliday) {
-                    const diffDays = Math.ceil((nextHoliday - today) / (1000 * 60 * 60 * 24));
+                    const diffTime = Math.abs(nextHoliday - today);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                     document.getElementById('holiday-countdown').innerHTML = `🏖️ 仲有 <b>${diffDays}</b> 日就放假啦！(${holidayName})`;
                 } else {
                     document.getElementById('holiday-countdown').innerHTML = `🗓️ 期待下一年假期`;
