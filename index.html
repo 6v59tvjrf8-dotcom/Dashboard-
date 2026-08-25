@@ -182,72 +182,74 @@
         }
         updateBibleVerse();
 
-        // 3. 政府 1823 公眾假期 API (終極雙重保險)
+        // 3. 政府 1823 公眾假期 API (終極不死離線後備版)
         async function fetchHoliday() {
             try {
-                // 正確嘅政府開放數據 JSON 網址
                 const url = 'https://www.1823.gov.hk/common/ical/tc.json';
                 let data = null;
                 
                 try {
-                    // 首選：使用 allorigins raw 讀取
-                    const res1 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-                    if (!res1.ok) throw new Error("Proxy 1 Failed");
-                    data = await res1.json();
-                } catch (err1) {
-                    // 備用：若首選失敗，自動切換至 codetabs proxy
-                    console.log("切換後備線路...");
-                    const res2 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`);
-                    if (!res2.ok) throw new Error("Proxy 2 Failed");
-                    data = await res2.json();
-                }
-
-                if (!data || !data.vcalendar || !data.vcalendar[0].vevent) {
-                    throw new Error("格式錯誤");
+                    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+                    if (!res.ok) throw new Error("Proxy Failed");
+                    data = await res.json();
+                } catch (err) {
+                    throw new Error("Network Fetch Failed - Switching to Offline Fallback");
                 }
 
                 const events = data.vcalendar[0].vevent;
-                const today = new Date();
-                today.setHours(0,0,0,0);
-                
-                // 確保假期由近至遠排序，防止政府檔案亂序
-                events.sort((a, b) => parseInt(a.dtstart[0]) - parseInt(b.dtstart[0]));
-                
-                let nextHoliday = null;
-                let holidayName = "";
-                
-                for (let i = 0; i < events.length; i++) {
-                    const dateStr = events[i].dtstart[0]; 
-                    if (!dateStr || dateStr.length < 8) continue;
+                calculateNextHoliday(events);
 
-                    const hDate = new Date(
-                        parseInt(dateStr.substring(0,4)), 
-                        parseInt(dateStr.substring(4,6)) - 1, 
-                        parseInt(dateStr.substring(6,8))
-                    );
-                    
-                    if (hDate.getTime() === today.getTime()) {
-                        document.getElementById('holiday-countdown').innerHTML = `🎉 今日放假啦！(${events[i].summary})`;
-                        return;
-                    } else if (hDate > today) {
-                        nextHoliday = hDate;
-                        holidayName = events[i].summary;
-                        break;
-                    }
-                }
-                
-                if (nextHoliday) {
-                    const diffTime = Math.abs(nextHoliday - today);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    document.getElementById('holiday-countdown').innerHTML = `🏖️ 仲有 <b>${diffDays}</b> 日就放假啦！(${holidayName})`;
-                } else {
-                    document.getElementById('holiday-countdown').innerHTML = `🗓️ 期待下一年假期`;
-                }
             } catch (e) {
-                console.error("Holiday API Error:", e);
-                document.getElementById('holiday-countdown').innerHTML = '🏖️ 暫無假期資訊';
+                console.log("切換至硬數據庫後備系統...");
+                // 終極防線：本地硬數據 (涵蓋常見紅日)
+                const fallbackEvents = [
+                    { dtstart: ["20240918"], summary: "中秋節翌日" }, { dtstart: ["20241001"], summary: "國慶日" }, { dtstart: ["20241011"], summary: "重陽節" }, { dtstart: ["20241225"], summary: "聖誕節" }, { dtstart: ["20241226"], summary: "聖誕節後第一個周日" },
+                    { dtstart: ["20250101"], summary: "元旦" }, { dtstart: ["20250129"], summary: "農曆年初一" }, { dtstart: ["20250418"], summary: "耶穌受難節" }, { dtstart: ["20250421"], summary: "復活節" }, { dtstart: ["20250501"], summary: "勞動節" }, { dtstart: ["20250505"], summary: "佛誕" }, { dtstart: ["20250531"], summary: "端午節" }, { dtstart: ["20250701"], summary: "特區成立紀念日" }, { dtstart: ["20251001"], summary: "國慶日" }, { dtstart: ["20251007"], summary: "中秋節翌日" }, { dtstart: ["20251029"], summary: "重陽節" }, { dtstart: ["20251225"], summary: "聖誕節" }, { dtstart: ["20251226"], summary: "聖誕節後第一個周日" },
+                    { dtstart: ["20260101"], summary: "元旦" }, { dtstart: ["20260217"], summary: "農曆年初一" }, { dtstart: ["20260403"], summary: "耶穌受難節" }, { dtstart: ["20260406"], summary: "復活節" }, { dtstart: ["20260501"], summary: "勞動節" }, { dtstart: ["20260524"], summary: "佛誕" }, { dtstart: ["20260619"], summary: "端午節" }, { dtstart: ["20260701"], summary: "特區成立紀念日" }, { dtstart: ["20260926"], summary: "中秋節翌日" }, { dtstart: ["20261001"], summary: "國慶日" }, { dtstart: ["20261019"], summary: "重陽節" }, { dtstart: ["20261225"], summary: "聖誕節" }, { dtstart: ["20261226"], summary: "聖誕節後第一個周日" }
+                ];
+                calculateNextHoliday(fallbackEvents);
             }
         }
+
+        // 獨立出計算邏輯，方便 API 與備用數據共用
+        function calculateNextHoliday(events) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            events.sort((a, b) => parseInt(a.dtstart[0]) - parseInt(b.dtstart[0]));
+            
+            let nextHoliday = null;
+            let holidayName = "";
+            
+            for (let i = 0; i < events.length; i++) {
+                const dateStr = events[i].dtstart[0]; 
+                if (!dateStr || dateStr.length < 8) continue;
+
+                const hDate = new Date(
+                    parseInt(dateStr.substring(0,4)), 
+                    parseInt(dateStr.substring(4,6)) - 1, 
+                    parseInt(dateStr.substring(6,8))
+                );
+                
+                if (hDate.getTime() === today.getTime()) {
+                    document.getElementById('holiday-countdown').innerHTML = `🎉 今日放假啦！(${events[i].summary})`;
+                    return;
+                } else if (hDate > today) {
+                    nextHoliday = hDate;
+                    holidayName = events[i].summary;
+                    break;
+                }
+            }
+            
+            if (nextHoliday) {
+                const diffTime = Math.abs(nextHoliday - today);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                document.getElementById('holiday-countdown').innerHTML = `🏖️ 仲有 <b>${diffDays}</b> 日就放假啦！(${holidayName})`;
+            } else {
+                document.getElementById('holiday-countdown').innerHTML = `🗓️ 期待下一年假期`;
+            }
+        }
+
         fetchHoliday();
 
         // 4. 天文台天氣 API
