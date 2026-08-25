@@ -182,7 +182,7 @@
         }
         updateBibleVerse();
 
-        // 3. 政府 1823 公眾假期 API (終極不死離線後備版)
+        // 3. 政府假期 API
         async function fetchHoliday() {
             try {
                 const url = 'https://www.1823.gov.hk/common/ical/tc.json';
@@ -193,15 +193,13 @@
                     if (!res.ok) throw new Error("Proxy Failed");
                     data = await res.json();
                 } catch (err) {
-                    throw new Error("Network Fetch Failed - Switching to Offline Fallback");
+                    throw new Error("Network Fetch Failed");
                 }
 
                 const events = data.vcalendar[0].vevent;
                 calculateNextHoliday(events);
 
             } catch (e) {
-                console.log("切換至硬數據庫後備系統...");
-                // 終極防線：本地硬數據 (涵蓋常見紅日)
                 const fallbackEvents = [
                     { dtstart: ["20240918"], summary: "中秋節翌日" }, { dtstart: ["20241001"], summary: "國慶日" }, { dtstart: ["20241011"], summary: "重陽節" }, { dtstart: ["20241225"], summary: "聖誕節" }, { dtstart: ["20241226"], summary: "聖誕節後第一個周日" },
                     { dtstart: ["20250101"], summary: "元旦" }, { dtstart: ["20250129"], summary: "農曆年初一" }, { dtstart: ["20250418"], summary: "耶穌受難節" }, { dtstart: ["20250421"], summary: "復活節" }, { dtstart: ["20250501"], summary: "勞動節" }, { dtstart: ["20250505"], summary: "佛誕" }, { dtstart: ["20250531"], summary: "端午節" }, { dtstart: ["20250701"], summary: "特區成立紀念日" }, { dtstart: ["20251001"], summary: "國慶日" }, { dtstart: ["20251007"], summary: "中秋節翌日" }, { dtstart: ["20251029"], summary: "重陽節" }, { dtstart: ["20251225"], summary: "聖誕節" }, { dtstart: ["20251226"], summary: "聖誕節後第一個周日" },
@@ -211,7 +209,6 @@
             }
         }
 
-        // 獨立出計算邏輯，方便 API 與備用數據共用
         function calculateNextHoliday(events) {
             const today = new Date();
             today.setHours(0,0,0,0);
@@ -224,12 +221,7 @@
             for (let i = 0; i < events.length; i++) {
                 const dateStr = events[i].dtstart[0]; 
                 if (!dateStr || dateStr.length < 8) continue;
-
-                const hDate = new Date(
-                    parseInt(dateStr.substring(0,4)), 
-                    parseInt(dateStr.substring(4,6)) - 1, 
-                    parseInt(dateStr.substring(6,8))
-                );
+                const hDate = new Date(parseInt(dateStr.substring(0,4)), parseInt(dateStr.substring(4,6)) - 1, parseInt(dateStr.substring(6,8)));
                 
                 if (hDate.getTime() === today.getTime()) {
                     document.getElementById('holiday-countdown').innerHTML = `🎉 今日放假啦！(${events[i].summary})`;
@@ -245,11 +237,8 @@
                 const diffTime = Math.abs(nextHoliday - today);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 document.getElementById('holiday-countdown').innerHTML = `🏖️ 仲有 <b>${diffDays}</b> 日就放假啦！(${holidayName})`;
-            } else {
-                document.getElementById('holiday-countdown').innerHTML = `🗓️ 期待下一年假期`;
             }
         }
-
         fetchHoliday();
 
         // 4. 天文台天氣 API
@@ -261,7 +250,7 @@
                 const humidity = data.humidity.data[0].value;
                 document.getElementById('temperature').innerText = yuenLongTemp;
                 document.getElementById('humidity').innerText = humidity;
-            } catch (e) { console.error('天氣載入失敗'); }
+            } catch (e) {}
         }
         
         // 5. 天文台預測 API
@@ -270,7 +259,7 @@
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc');
                 const data = await res.json();
                 document.getElementById('forecast-desc').innerText = data.forecastDesc;
-            } catch (e) { document.getElementById('forecast-desc').innerText = '預測載入失敗'; }
+            } catch (e) {}
         }
 
         // 6. 天文台警告 API
@@ -285,7 +274,7 @@
                     if (data[key].name) { warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`; }
                 }
                 warningContainer.innerHTML = warningHtml;
-            } catch (e) { console.error('警告載入失敗'); }
+            } catch (e) {}
         }
 
         fetchWeather(); fetchForecast(); fetchWarnings();
@@ -353,30 +342,59 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API
+        // 8. 交通消息 API (終極防緩存實時版)
         async function fetchTraffic() {
             try {
-                const tdUrl = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
-                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(tdUrl)}`);
+                // 1. 加入隨機 timestamp，強制繞過 Proxy 緩存，保證攞最新資料
+                const timestamp = new Date().getTime();
+                const tdUrl = `https://www.td.gov.hk/tc/special_news/trafficnews.xml?t=${timestamp}`;
+                
+                // 2. 用 allorigins.win/get 解決 CORS 及 XML 解析問題
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(tdUrl)}`;
+                const res = await fetch(proxyUrl);
                 const data = await res.json();
+                
+                if (!data.contents) throw new Error("No data received");
 
-                if (data.status !== 'ok' || !data.items || data.items.length === 0) {
-                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-                    return;
-                }
+                // 3. 手動解析 XML
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(data.contents, "text/xml");
+                const items = xml.querySelectorAll("item");
 
                 let html = '';
-                for (let i = 0; i < Math.min(2, data.items.length); i++) {
-                    const title = data.items[i].title;
+                let validMsgCount = 0;
+
+                for (let i = 0; i < items.length; i++) {
+                    const titleNode = items[i].querySelector("title");
+                    if (!titleNode) continue;
+                    
+                    const title = titleNode.textContent.trim();
+                    
+                    // 4. 自動過濾運輸署嘅「暢順」等預設文字
+                    if (title.includes("交通大致暢順") || title.includes("沒有特別交通消息")) {
+                        continue;
+                    }
+
                     html += `<div class="traffic-item">🚗 ${title}</div>`;
+                    validMsgCount++;
+                    
+                    if (validMsgCount >= 2) break; // 最多顯示 2 條
                 }
-                document.getElementById('traffic-data').innerHTML = html;
+
+                // 5. 如果過濾後冇任何特別消息，就顯示暢順
+                if (validMsgCount === 0) {
+                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+                } else {
+                    document.getElementById('traffic-data').innerHTML = html;
+                }
             } catch (e) {
+                console.error("Traffic Error:", e);
                 document.getElementById('traffic-data').innerHTML = '<div style="color: #999;">暫時無法讀取交通消息</div>';
             }
         }
         fetchTraffic();
-        setInterval(fetchTraffic, 300000); 
+        // 交通消息改為每 2 分鐘實時刷新
+        setInterval(fetchTraffic, 120000); 
     </script>
 </body>
 </html>
