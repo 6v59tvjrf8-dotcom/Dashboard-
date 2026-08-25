@@ -48,11 +48,10 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; }
         .eta-exact { font-size: 0.85em; color: #888; margin-top: 2px; }
         
-        /* 交通消息樣式 */
-        .traffic-panel { display: flex; flex-direction: column; overflow-y: auto; max-height: 35%; }
-        .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
-        .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-
+        /* 交通消息樣式 (改為 iframe 滿版顯示) */
+        .traffic-panel { display: flex; flex-direction: column; flex: 1; min-height: 220px; padding: 15px; }
+        .iframe-container { flex: 1; border-radius: 10px; overflow: hidden; border: 1px solid #eee; background: #f9f9f9; position: relative; }
+        
         /* 聖經金句區塊 */
         .bible-panel { padding: 15px 20px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
@@ -96,9 +95,12 @@
                 <div id="bus-data">載入中...</div>
             </div>
             
+            <!-- 交通消息直嵌網頁區塊 -->
             <div class="card traffic-panel">
-                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">📻 即時交通消息</h3>
-                <div id="traffic-data">載入中...</div>
+                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43; margin-bottom: 10px;">📻 港台即時交通消息</h3>
+                <div class="iframe-container">
+                    <iframe src="https://programme.rthk.hk/channel/radio/trafficnews/index.php" style="width: 100%; height: 100%; border: none;"></iframe>
+                </div>
             </div>
         </div>
     </div>
@@ -328,90 +330,6 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (4 核心裝甲代理陣列，確保 100% 連線成功)
-        async function fetchTraffic() {
-            const container = document.getElementById('traffic-data');
-            const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
-            let items = [];
-
-            // 輔助工具：將 XML 字串轉化為陣列
-            const parseXML = (xmlStr) => {
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(xmlStr, "text/xml");
-                const nodes = xml.querySelectorAll("item title");
-                return Array.from(nodes).map(n => n.textContent.trim());
-            };
-
-            // 準備 4 條獨立且機制不同嘅專線
-            const strategies = [
-                // 專線 1：AllOrigins (穩定，自動解開 CORS)
-                async () => {
-                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=true`);
-                    const data = await res.json();
-                    return parseXML(data.contents);
-                },
-                // 專線 2：Codetabs (直接讀取純文字)
-                async () => {
-                    const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rthkUrl)}`);
-                    const text = await res.text();
-                    return parseXML(text);
-                },
-                // 專線 3：Corsproxy.io (另一條備用直接通道)
-                async () => {
-                    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(rthkUrl)}`);
-                    const text = await res.text();
-                    return parseXML(text);
-                },
-                // 專線 4：RSS2JSON (最傳統、最包容嘅企業級備用通道)
-                async () => {
-                    const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
-                    const data = await res.json();
-                    return data.items.map(item => item.title.trim());
-                }
-            ];
-
-            // 啟動裝甲陣列：順序嘗試，一擊即中即刻停
-            for (let strategy of strategies) {
-                try {
-                    const result = await strategy();
-                    if (result && result.length > 0) {
-                        items = result;
-                        break; 
-                    }
-                } catch (e) {
-                    console.warn("該代理不通，0.1秒內自動切換至下一條專線...");
-                }
-            }
-
-            // 如果全部 4 條線都斷 (機率近乎 0)
-            if (items.length === 0) {
-                container.innerHTML = '<div style="color: #ff6b81; font-weight: bold; font-size: 0.9em;">⚠️ 暫時無法連線至交通伺服器</div>';
-                return;
-            }
-
-            // 開始過濾並顯示畫面
-            let html = '';
-            let validCount = 0;
-
-            for (let title of items) {
-                if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
-                html += `<div class="traffic-item">🚗 ${title}</div>`;
-                validCount++;
-                if (validCount >= 3) break; // 最多顯示 3 條最新突發
-            }
-
-            if (validCount === 0) {
-                container.innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-            } else {
-                container.innerHTML = html;
-            }
-        }
-        
-        fetchTraffic();
-        
-        // 【關鍵改動】：將更新頻率調至「每 3 分鐘 (180000ms)」
-        // 避免因為頻繁刷新，導致免費 Proxy 將你部機嘅 IP 列入防濫用黑名單！
-        setInterval(fetchTraffic, 180000); 
     </script>
 </body>
 </html>
