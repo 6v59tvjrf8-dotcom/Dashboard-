@@ -9,7 +9,6 @@
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* 頂部時間及日期樣式 */
         .header { display: flex; align-items: baseline; gap: 15px; color: #007aff; flex-shrink: 0; flex-wrap: wrap; }
         #time { font-size: 3em; font-weight: bold; }
         .date-section { display: flex; flex-direction: column; justify-content: center; }
@@ -22,7 +21,6 @@
             body { height: auto; min-height: 100vh; overflow: auto; }
         }
         
-        /* 天氣樣式 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
         .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; }
         #weather-warnings { min-height: 25px; margin-bottom: 5px; }
@@ -32,13 +30,9 @@
         .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; }
         #forecast-desc { font-size: 0.95em; color: #555; line-height: 1.5; }
         
-        /* 右側欄：包含巴士與交通 */
         .right-column { flex: 1; display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
-        @media (max-width: 768px) {
-            .right-column { overflow: visible; }
-        }
+        @media (max-width: 768px) { .right-column { overflow: visible; } }
         
-        /* 巴士樣式 */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
         .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex: 1; min-width: 120px; }
@@ -48,15 +42,12 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; }
         .eta-exact { font-size: 0.85em; color: #888; margin-top: 2px; }
         
-        /* 交通消息樣式 */
         .traffic-panel { display: flex; flex-direction: column; overflow-y: auto; max-height: 35%; }
         .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
         .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
-        /* 聖經金句區塊 */
         .bible-panel { padding: 15px 20px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
-        /* 音樂按鈕樣式 */
         .audio-panel { padding-top: 15px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -15px; }
         .radio-controls { display: flex; flex-wrap: wrap; gap: 10px; padding-bottom: 5px; justify-content: center; }
         .radio-btn { flex: 1; min-width: 90px; padding: 10px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.95em; transition: all 0.2s; font-weight: bold; text-align: center; }
@@ -122,23 +113,9 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         let ytPlayer;
-
-        function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('youtube-player', {
-                height: '1', width: '1', videoId: '', 
-                playerVars: { 'playsinline': 1, 'controls': 0 }
-            });
-        }
-        function changeRadio(videoId, btnElement) {
-            if (ytPlayer && ytPlayer.loadVideoById) { ytPlayer.loadVideoById(videoId); }
-            document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
-            btnElement.classList.add('active');
-        }
-        function stopRadio() {
-            if (ytPlayer && ytPlayer.pauseVideo) { ytPlayer.pauseVideo(); }
-            document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('stop-btn').classList.add('active');
-        }
+        function onYouTubeIframeAPIReady() { ytPlayer = new YT.Player('youtube-player', { height: '1', width: '1', videoId: '', playerVars: { 'playsinline': 1, 'controls': 0 } }); }
+        function changeRadio(videoId, btnElement) { if (ytPlayer && ytPlayer.loadVideoById) { ytPlayer.loadVideoById(videoId); } document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active')); btnElement.classList.add('active'); }
+        function stopRadio() { if (ytPlayer && ytPlayer.pauseVideo) { ytPlayer.pauseVideo(); } document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active')); document.getElementById('stop-btn').classList.add('active'); }
 
         // 1. 實時時鐘
         function updateClock() {
@@ -187,18 +164,14 @@
             try {
                 const url = 'https://www.1823.gov.hk/common/ical/tc.json';
                 let data = null;
-                
                 try {
                     const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
                     if (!res.ok) throw new Error("Proxy Failed");
                     data = await res.json();
-                } catch (err) {
-                    throw new Error("Network Fetch Failed");
-                }
+                } catch (err) { throw new Error("Network Fetch Failed"); }
 
                 const events = data.vcalendar[0].vevent;
                 calculateNextHoliday(events);
-
             } catch (e) {
                 const fallbackEvents = [
                     { dtstart: ["20240918"], summary: "中秋節翌日" }, { dtstart: ["20241001"], summary: "國慶日" }, { dtstart: ["20241011"], summary: "重陽節" }, { dtstart: ["20241225"], summary: "聖誕節" }, { dtstart: ["20241226"], summary: "聖誕節後第一個周日" },
@@ -212,27 +185,17 @@
         function calculateNextHoliday(events) {
             const today = new Date();
             today.setHours(0,0,0,0);
-            
             events.sort((a, b) => parseInt(a.dtstart[0]) - parseInt(b.dtstart[0]));
-            
             let nextHoliday = null;
             let holidayName = "";
-            
             for (let i = 0; i < events.length; i++) {
                 const dateStr = events[i].dtstart[0]; 
                 if (!dateStr || dateStr.length < 8) continue;
                 const hDate = new Date(parseInt(dateStr.substring(0,4)), parseInt(dateStr.substring(4,6)) - 1, parseInt(dateStr.substring(6,8)));
-                
                 if (hDate.getTime() === today.getTime()) {
-                    document.getElementById('holiday-countdown').innerHTML = `🎉 今日放假啦！(${events[i].summary})`;
-                    return;
-                } else if (hDate > today) {
-                    nextHoliday = hDate;
-                    holidayName = events[i].summary;
-                    break;
-                }
+                    document.getElementById('holiday-countdown').innerHTML = `🎉 今日放假啦！(${events[i].summary})`; return;
+                } else if (hDate > today) { nextHoliday = hDate; holidayName = events[i].summary; break; }
             }
-            
             if (nextHoliday) {
                 const diffTime = Math.abs(nextHoliday - today);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -342,43 +305,25 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (終極三重過牆 + 本地防線)
+        // 8. 交通消息 API (終極修正版：精準破解 Proxy 限制)
         async function fetchTraffic() {
             try {
-                // 1. 強制加入隨機時間戳破解緩存
+                // 官方 XML 網址保持原汁原味，不加任何參數，避免被政府 Server Reject
+                const tdUrl = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
                 const timestamp = new Date().getTime();
-                const tdUrl = encodeURIComponent(`https://www.td.gov.hk/tc/special_news/trafficnews.xml?t=${timestamp}`);
                 
                 let xmlText = null;
 
-                // 嘗試線路一：CorsProxy.io (極速直連)
                 try {
-                    const res1 = await fetch(`https://corsproxy.io/?${tdUrl}`);
-                    if (res1.ok) xmlText = await res1.text();
-                } catch (e) {}
+                    // 將 timestamp 加喺 proxy 網址尾，成功呃過 Cache，又唔會激嬲政府 Server
+                    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(tdUrl)}&disableCache=${timestamp}`);
+                    if (res.ok) xmlText = await res.text();
+                } catch (e) { console.log('Proxy Failed'); }
 
-                // 嘗試線路二：AllOrigins Raw (穩定抓取)
-                if (!xmlText) {
-                    try {
-                        const res2 = await fetch(`https://api.allorigins.win/raw?url=${tdUrl}`);
-                        if (res2.ok) xmlText = await res2.text();
-                    } catch (e) {}
-                }
-
-                // 嘗試線路三：Codetabs (後備支援)
-                if (!xmlText) {
-                    try {
-                        const res3 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${tdUrl}`);
-                        if (res3.ok) xmlText = await res3.text();
-                    } catch (e) {}
-                }
-
-                // 確保成功獲取有效 XML
                 if (!xmlText || !xmlText.includes('<item>')) {
-                    throw new Error("Cannot fetch valid XML from TD");
+                    throw new Error("無法連接運輸署伺服器");
                 }
 
-                // 手動精準解析 XML
                 const parser = new DOMParser();
                 const xml = parser.parseFromString(xmlText, "text/xml");
                 const items = xml.querySelectorAll("item");
@@ -392,19 +337,16 @@
                     
                     const title = titleNode.textContent.trim();
                     
-                    // 過濾無關痛癢或「沒有特別消息」的預設句子
                     if (title.includes("交通大致暢順") || title.includes("沒有特別") || title === "") {
                         continue;
                     }
 
                     html += `<div class="traffic-item">🚗 ${title}</div>`;
                     validMsgCount++;
-                    
-                    // 最多顯示最新 2 單突發
-                    if (validMsgCount >= 2) break; 
+                    if (validMsgCount >= 3) break; // 顯示多 1 單突發，變 3 單
                 }
 
-                // 判斷輸出：有意外出意外，無意外出綠色暢順
+                // 只有成功連線且冇突發，先會顯示綠色暢順
                 if (validMsgCount === 0) {
                     document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
                 } else {
@@ -412,14 +354,13 @@
                 }
 
             } catch (e) {
-                console.error("Traffic Data Fallback Triggered:", e);
-                // 終極防呆機制：如果三個 Proxy 都被政府封鎖，顯示綠色暢順，絕對不顯示 Error
-                document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順 (暫無突發)</div>';
+                console.error("Traffic Data Error:", e);
+                // 真正出錯時，顯示紅色錯誤，唔好亂報平安！
+                document.getElementById('traffic-data').innerHTML = '<div style="color: #ff6b81; font-weight: bold; font-size: 0.9em;">⚠️ 暫時無法連線至運輸署</div>';
             }
         }
         
         fetchTraffic();
-        // 交通消息改為極速每 2 分鐘更新
         setInterval(fetchTraffic, 120000); 
     </script>
 </body>
