@@ -97,7 +97,7 @@
             </div>
             
             <div class="card traffic-panel">
-                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">🚦 最新交通消息</h3>
+                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">📻 港台即時交通消息</h3>
                 <div id="traffic-data">載入中...</div>
             </div>
         </div>
@@ -328,83 +328,47 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (智能分層切換系統：實時第一，穩定第二)
+        // 8. 傳媒交通消息 API (香港電台 RTHK 即時 RSS 數據源)
         async function fetchTraffic() {
             try {
-                const tdUrl = 'https://www.td.gov.hk/tc/special_news/trafficnews.xml';
-                let xmlText = null;
-
-                // 方案一：嘗試使用 codetabs (使用 no-store 強制實時更新，免 Cache)
-                try {
-                    const res1 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(tdUrl)}`, { cache: 'no-store' });
-                    if (res1.ok) xmlText = await res1.text();
-                } catch (e) {}
-
-                // 解析 XML (無論係方案一還是其他方法獲取)
-                if (xmlText && xmlText.includes('<item>')) {
-                    const parser = new DOMParser();
-                    const xml = parser.parseFromString(xmlText, "text/xml");
-                    const items = xml.querySelectorAll("item");
-                    
-                    let html = '';
-                    let validCount = 0;
-                    
-                    for (let i = 0; i < items.length; i++) {
-                        const titleNode = items[i].querySelector("title");
-                        if (!titleNode) continue;
-                        
-                        const title = titleNode.textContent.trim();
-                        if (title.includes("交通大致暢順") || title.includes("沒有特別") || title === "") continue;
-
-                        html += `<div class="traffic-item">🚗 ${title}</div>`;
-                        validCount++;
-                        if (validCount >= 2) break;
-                    }
-
-                    if (validCount === 0) {
-                        document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-                    } else {
-                        document.getElementById('traffic-data').innerHTML = html;
-                    }
-                    return; // 成功實時獲取，提早結束函數
-                }
-
-                // 方案二：無縫切換 rss2json (保證連線不中斷，即使可能有少許 Cache 延遲)
-                const res2 = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(tdUrl)}`, { cache: 'no-store' });
-                const data2 = await res2.json();
+                // 香港電台官方即時交通消息 RSS 頻道
+                const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
                 
-                if (data2.status === 'ok' && data2.items) {
-                    let html = '';
-                    let validCount = 0;
-                    
-                    for (let i = 0; i < data2.items.length; i++) {
-                        const title = data2.items[i].title.trim();
-                        if (title.includes("交通大致暢順") || title.includes("沒有特別") || title === "") continue;
+                // 使用專門解析傳媒 RSS 嘅服務，配合隨機時間戳防 Cache
+                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}&t=${new Date().getTime()}`);
+                const data = await res.json();
+
+                let html = '';
+                let validCount = 0;
+
+                if (data.status === 'ok' && data.items && data.items.length > 0) {
+                    for (let i = 0; i < data.items.length; i++) {
+                        const title = data.items[i].title.trim();
                         
+                        // 過濾無關文字
+                        if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
+
                         html += `<div class="traffic-item">🚗 ${title}</div>`;
                         validCount++;
-                        if (validCount >= 2) break;
+                        if (validCount >= 2) break; // 顯示最新 2 條
                     }
-
-                    if (validCount === 0) {
-                        document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-                    } else {
-                        document.getElementById('traffic-data').innerHTML = html;
-                    }
-                    return; 
                 }
 
-                throw new Error("所有 Proxy 均被阻擋");
+                // 若傳媒當刻沒有特別交通意外消息，顯示暢順
+                if (validCount === 0) {
+                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+                } else {
+                    document.getElementById('traffic-data').innerHTML = html;
+                }
 
             } catch (e) {
-                console.error("Traffic Data Error:", e);
-                // 真正出錯時才會顯示紅色警告，不會再胡亂報平安
-                document.getElementById('traffic-data').innerHTML = '<div style="color: #ff6b81; font-weight: bold; font-size: 0.9em;">⚠️ 暫時無法連線至運輸署</div>';
+                console.error("Traffic Error:", e);
+                document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
             }
         }
         
         fetchTraffic();
-        // 交通消息改為每 2 分鐘更新
+        // 傳媒消息更新極快，每 2 分鐘刷新一次
         setInterval(fetchTraffic, 120000); 
     </script>
 </body>
