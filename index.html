@@ -328,25 +328,59 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 傳媒交通消息 API (香港電台 RTHK 終極無延遲直讀版)
+        // 8. 傳媒交通消息 API (港台 RSS 三重不死切換系統)
         async function fetchTraffic() {
             try {
-                // 港台官方交通 RSS
                 const rthkUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_tdtraffic.xml';
                 const timestamp = new Date().getTime();
-                
                 let xmlText = null;
 
+                // 第一重：Codetabs 極速代理
                 try {
-                    // 徹底放棄 rss2json，直接讀取原始 XML，並加入 disableCache 強制破除 Proxy 緩存
-                    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(rthkUrl)}&disableCache=${timestamp}`);
-                    if (res.ok) xmlText = await res.text();
-                } catch (e) {
-                    console.log('Proxy 1 Failed');
+                    const res1 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rthkUrl)}`);
+                    if (res1.ok) xmlText = await res1.text();
+                } catch (e) { console.log('Proxy 1 failed'); }
+
+                // 第二重：AllOrigins 穩定代理 (使用 JSON 包裝避開 CORS Header 封鎖)
+                if (!xmlText || !xmlText.includes('<item>')) {
+                    try {
+                        const res2 = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=${timestamp}`);
+                        if (res2.ok) {
+                            const data = await res2.json();
+                            xmlText = data.contents;
+                        }
+                    } catch (e) { console.log('Proxy 2 failed'); }
                 }
 
+                // 第三重：RSS2JSON 終極保底機制
                 if (!xmlText || !xmlText.includes('<item>')) {
-                    throw new Error("無法連接港台伺服器");
+                    try {
+                        const res3 = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
+                        const data3 = await res3.json();
+                        
+                        if (data3.status === 'ok' && data3.items) {
+                            let html = '';
+                            let validCount = 0;
+                            for (let i = 0; i < data3.items.length; i++) {
+                                const title = data3.items[i].title.trim();
+                                if (title.includes("大致暢順") || title.includes("沒有特別") || title === "") continue;
+                                html += `<div class="traffic-item">🚗 ${title}</div>`;
+                                validCount++;
+                                if (validCount >= 3) break;
+                            }
+                            if (validCount === 0) {
+                                document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+                            } else {
+                                document.getElementById('traffic-data').innerHTML = html;
+                            }
+                            return; // 成功使用 JSON，提早結束函數
+                        }
+                    } catch (e) { console.log('Proxy 3 failed'); }
+                }
+
+                // 檢查是否成功獲得 XML
+                if (!xmlText || !xmlText.includes('<item>')) {
+                    throw new Error("所有連線方式均失效");
                 }
 
                 // 手動解析 XML
@@ -362,8 +396,6 @@
                     if (!titleNode) continue;
                     
                     let title = titleNode.textContent.trim();
-                    
-                    // 過濾無關文字
                     if (title.includes("大致暢順") || title.includes("沒有特別") || title === "") continue;
 
                     html += `<div class="traffic-item">🚗 ${title}</div>`;
@@ -371,7 +403,6 @@
                     if (validCount >= 3) break; // 顯示最新 3 條突發
                 }
 
-                // 若傳媒當刻沒有特別交通意外消息，顯示暢順
                 if (validCount === 0) {
                     document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
                 } else {
@@ -385,7 +416,7 @@
         }
         
         fetchTraffic();
-        // 交通消息改為極速每 1 分鐘刷新一次，保證秒速同步
+        // 傳媒消息更新極快，每 1 分鐘刷新一次
         setInterval(fetchTraffic, 60000); 
     </script>
 </body>
