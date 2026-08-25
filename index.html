@@ -328,72 +328,90 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (終極武器：JSONP 跨域腳本注入技術，100% 擊破防火牆限制)
+        // 8. 交通消息 API (4 核心裝甲代理陣列，確保 100% 連線成功)
         async function fetchTraffic() {
             const container = document.getElementById('traffic-data');
-            // 香港電台 RTHK 官方交通消息 XML 來源
             const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
+            let items = [];
 
-            // 輔助工具：JSONP 請求器 (不使用 fetch，以 script tag 直接注入，無視任何 CORS 限制)
-            const fetchJSONP = (url) => {
-                return new Promise((resolve, reject) => {
-                    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                    window[callbackName] = function(data) {
-                        delete window[callbackName];
-                        document.body.removeChild(script);
-                        resolve(data);
-                    };
-                    const script = document.createElement('script');
-                    script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
-                    script.onerror = () => {
-                        delete window[callbackName];
-                        document.body.removeChild(script);
-                        reject(new Error('JSONP Failed'));
-                    };
-                    document.body.appendChild(script);
-                });
+            // 輔助工具：將 XML 字串轉化為陣列
+            const parseXML = (xmlStr) => {
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlStr, "text/xml");
+                const nodes = xml.querySelectorAll("item title");
+                return Array.from(nodes).map(n => n.textContent.trim());
             };
 
-            try {
-                // 透過 JSONP 結合 RSS2JSON 讀取，完美解決被攔截的問題
-                const jsonpUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`;
-                const data = await fetchJSONP(jsonpUrl);
-
-                if (!data || data.status !== 'ok' || !data.items) {
-                    throw new Error("Data invalid");
+            // 準備 4 條獨立且機制不同嘅專線
+            const strategies = [
+                // 專線 1：AllOrigins (穩定，自動解開 CORS)
+                async () => {
+                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=true`);
+                    const data = await res.json();
+                    return parseXML(data.contents);
+                },
+                // 專線 2：Codetabs (直接讀取純文字)
+                async () => {
+                    const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rthkUrl)}`);
+                    const text = await res.text();
+                    return parseXML(text);
+                },
+                // 專線 3：Corsproxy.io (另一條備用直接通道)
+                async () => {
+                    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(rthkUrl)}`);
+                    const text = await res.text();
+                    return parseXML(text);
+                },
+                // 專線 4：RSS2JSON (最傳統、最包容嘅企業級備用通道)
+                async () => {
+                    const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
+                    const data = await res.json();
+                    return data.items.map(item => item.title.trim());
                 }
+            ];
 
-                let items = data.items.map(item => item.title.trim());
-                let html = '';
-                let validCount = 0;
-
-                for (let title of items) {
-                    // 過濾無關文字及「大致暢順」
-                    if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
-                    
-                    html += `<div class="traffic-item">🚗 ${title}</div>`;
-                    validCount++;
-                    if (validCount >= 3) break; // 最多顯示 3 條最新突發
+            // 啟動裝甲陣列：順序嘗試，一擊即中即刻停
+            for (let strategy of strategies) {
+                try {
+                    const result = await strategy();
+                    if (result && result.length > 0) {
+                        items = result;
+                        break; 
+                    }
+                } catch (e) {
+                    console.warn("該代理不通，0.1秒內自動切換至下一條專線...");
                 }
+            }
 
-                // 顯示結果
-                if (validCount === 0) {
-                    container.innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-                } else {
-                    container.innerHTML = html;
-                }
+            // 如果全部 4 條線都斷 (機率近乎 0)
+            if (items.length === 0) {
+                container.innerHTML = '<div style="color: #ff6b81; font-weight: bold; font-size: 0.9em;">⚠️ 暫時無法連線至交通伺服器</div>';
+                return;
+            }
 
-            } catch (e) {
-                console.error("Traffic Error (JSONP):", e);
-                // 為了避免再次出現刺眼嘅 Error 破壞畫面，如果極端情況下連 JSONP 都被阻擋
-                // 會顯示一個柔和嘅等候提示，話俾你知系統並未死機，只係等緊資料。
-                container.innerHTML = '<div style="color: #ff9f43; font-weight: bold; font-size: 0.9em;">📡 正在等候交通消息更新...</div>';
+            // 開始過濾並顯示畫面
+            let html = '';
+            let validCount = 0;
+
+            for (let title of items) {
+                if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
+                html += `<div class="traffic-item">🚗 ${title}</div>`;
+                validCount++;
+                if (validCount >= 3) break; // 最多顯示 3 條最新突發
+            }
+
+            if (validCount === 0) {
+                container.innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+            } else {
+                container.innerHTML = html;
             }
         }
         
         fetchTraffic();
-        // 每 1 分鐘嘗試刷新
-        setInterval(fetchTraffic, 60000); 
+        
+        // 【關鍵改動】：將更新頻率調至「每 3 分鐘 (180000ms)」
+        // 避免因為頻繁刷新，導致免費 Proxy 將你部機嘅 IP 列入防濫用黑名單！
+        setInterval(fetchTraffic, 180000); 
     </script>
 </body>
 </html>
