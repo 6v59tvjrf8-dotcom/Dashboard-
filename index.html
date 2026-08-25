@@ -73,13 +73,11 @@
         <div id="time">載入中...</div>
         <div class="date-section">
             <div id="date"></div>
-            <!-- 公眾假期倒數顯示區 -->
             <div id="holiday-countdown">計算假期中...</div>
         </div>
     </div>
 
     <div class="content">
-        <!-- 左側：天氣 -->
         <div class="card weather-panel">
             <h3 style="margin-top:0;">☀️ 元朗區實時天氣</h3>
             <div id="weather-warnings"></div> 
@@ -92,7 +90,6 @@
             </div>
         </div>
 
-        <!-- 右側：巴士 + 交通 -->
         <div class="right-column">
             <div class="card bus-panel">
                 <h3 style="margin-top:0;">🚌 269D 往瀝源</h3>
@@ -106,7 +103,6 @@
         </div>
     </div>
 
-    <!-- 底部組合：聖經金句 + 音樂控制台 -->
     <div class="card bible-panel">
         <h3 style="margin-top:0; font-size: 1.05em; color: #6c5ce7; margin-bottom: 8px;">📖 每日金句</h3>
         <div id="bible-verse" style="font-size: 1.05em; color: #444; line-height: 1.5; font-weight: 500;">載入中...</div>
@@ -127,7 +123,6 @@
     <script>
         let ytPlayer;
 
-        // YouTube 播放器設定
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('youtube-player', {
                 height: '1', width: '1', videoId: '', 
@@ -154,7 +149,7 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // 2. 每日聖經金句 (擴充庫)
+        // 2. 每日聖經金句
         function updateBibleVerse() {
             const verses = [
                 "「當將你的事交託耶和華，並倚靠他，他就必成全。」(詩篇 37:5)",
@@ -176,68 +171,50 @@
                 "「但願使人有盼望的神，因信將諸般的喜樂、平安充滿你們的心。」(羅馬書 15:13)",
                 "「神是我們的避難所，是我們的力量，是我們在患難中隨時的幫助。」(詩篇 46:1)",
                 "「但那等候耶和華的，必重新得力。他們必如鷹展翅上騰。」(以賽亞書 40:31)",
-                "「信就是所望之事的實底，是未見之事的確據。」(希伯來書 11:1)",
-                "「愛是恆久忍耐，又有恩慈；愛是不嫉妒；愛是不自誇，不張狂。」(哥林多前書 13:4)",
-                "「如今常存的有信，有望，有愛這三樣，其中最大的是愛。」(哥林多前書 13:13)",
-                "「聖靈所結的果子，就是仁愛、喜樂、和平、忍耐、恩慈、良善、信實、溫柔、節制。」(加拉太書 5:22-23)",
-                "「你們得救是本乎恩，也因著信；這並不是出於自己，乃是神所賜的。」(以弗所書 2:8)",
-                "「因為神賜給我們，不是膽怯的心，乃是剛強、仁愛、謹守的心。」(提摩太後書 1:7)",
-                "「你們中間若有缺少智慧的，應當求那厚賜與眾人、也不斥責人的神，主就必賜給他。」(雅各書 1:5)",
-                "「你們要將一切的憂慮卸給神，因為他顧念你們。」(彼得前書 5:7)",
-                "「我們愛，因為神先愛我們。」(約翰一書 4:19)",
-                "「神要擦去他們一切的眼淚；不再有死亡，也不再有悲哀、哭號、疼痛。」(啟示錄 21:4)",
-                "「惟喜愛耶和華的律法，晝夜思想，這人便為有福！」(詩篇 1:2)",
-                "「耶和華是我的亮光，是我的拯救，我還怕誰呢？」(詩篇 27:1)",
-                "「你們要嘗嘗主恩的滋味，便知道他是美善；投靠他的人有福了！」(詩篇 34:8)",
-                "「我的心哪，你要稱頌耶和華！凡在我裡面的，也要稱頌他的聖名！」(詩篇 103:1)",
-                "「你要保守你心，勝過保守一切，因為一生的果效是由心發出。」(箴言 4:23)",
-                "「你所做的，要交託耶和華，你所謀的，就必成立。」(箴言 16:3)",
-                "「因有一嬰孩為我們而生；有一子賜給我們... 稱為奇妙策士、全能的神、永在的父、和平的君。」(以賽亞書 9:6)",
-                "「哪知他為我們的過犯受害，為我們的罪孽壓傷... 因他受的鞭傷，我們得醫治。」(以賽亞書 53:5)",
-                "「我們不致消滅，是出於耶和華諸般的慈愛；是因他的憐憫不致斷絕。」(耶利米哀歌 3:22)",
-                "「世人哪，耶和華已指示你何為善。他向你所要的是什麼呢？只要你行公義，好憐憫，存謙卑的心，與你的神同行。」(彌迦書 6:8)",
-                "「你們是世上的光。城造在山上，是不能隱藏的。」(馬太福音 5:14)",
-                "「所以，你們要去，使萬民作我的門徒，奉父、子、聖靈的名給他們施洗。」(馬太福音 28:19)",
-                "「耶穌看著他們，說：在人是不能，在神卻不然，因為神凡事都能。」(馬可福音 10:27)",
-                "「因為出於神的話，沒有一句不帶能力的。」(路加福音 1:37)",
-                "「耶穌說：我就是道路、真理、生命；若不藉著我，沒有人能到父那裡去。」(約翰福音 14:6)",
-                "「不要效法這個世界，只要心意更新而變化，叫你們察驗何為神的善良、純全、可喜悅的旨意。」(羅馬書 12:2)",
-                "「你們所遇見的試探，無非是人所能受的。神是信實的，必不叫你們受試探過於所能受的。」(哥林多前書 10:13)",
-                "「若有人在基督裡，他就是新造的人，舊事已過，都變成新的了。」(哥林多後書 5:17)",
-                "「我還有末了的話：你們要靠著主，倚賴他的大能大力作剛強的人。」(以弗所書 6:10)",
-                "「凡事不可結黨，不可貪圖虛浮的榮耀；只要存心謙卑，各人看別人比自己強。」(腓立比書 2:3)",
-                "「無論做什麼，都要從心裡做，像是給主做的，不是給人做的。」(歌羅西書 3:23)",
-                "「然而，敬虔加上知足的心便是大利了。」(提摩太前書 6:6)",
-                "「所以，我們只管坦然無懼地來到施恩的寶座前，為要得憐恤，蒙恩惠，作隨時的幫助。」(希伯來書 4:16)"
+                "「信就是所望之事的實底，是未見之事的確據。」(希伯來書 11:1)"
             ];
-            
             const now = new Date();
             const start = new Date(now.getFullYear(), 0, 0);
             const diff = now - start;
-            // 透過公式根據一年中的日數，隨機且穩定地抽出金句
             const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
-            // 使用質數 7 進行隨機化洗牌，確保每日不同
             const index = (dayOfYear * 7) % verses.length;
             document.getElementById('bible-verse').innerText = verses[index];
         }
         updateBibleVerse();
 
-        // 3. 政府 1823 公眾假期 API (已修復為最新官方網址)
+        // 3. 政府 1823 公眾假期 API (雙重保險版)
         async function fetchHoliday() {
             try {
-                // 使用最新官方 tc.json 檔案
-                const res = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.1823.gov.hk/common/ical/tc.json'));
-                const data = await res.json();
-                const events = data.vcalendar[0].vevent;
+                const url = 'https://vcal.1823.gov.hk/res/vcal/tc.json';
+                let data;
                 
+                try {
+                    // 嘗試直接讀取
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error("Direct fetch failed");
+                    data = await res.json();
+                } catch (err) {
+                    // 失敗則自動切換使用穩定 Proxy
+                    const proxyRes = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`);
+                    data = await proxyRes.json();
+                }
+
+                if (!data || !data.vcalendar || !data.vcalendar[0].vevent) {
+                    throw new Error("Invalid holiday data format");
+                }
+
+                const events = data.vcalendar[0].vevent;
                 const today = new Date();
                 today.setHours(0,0,0,0);
+                
+                // 確保日期按先後排序
+                events.sort((a, b) => parseInt(a.dtstart[0]) - parseInt(b.dtstart[0]));
+                
                 let nextHoliday = null;
                 let holidayName = "";
                 
                 for (let i = 0; i < events.length; i++) {
                     const dateStr = events[i].dtstart[0]; 
-                    // 格式: YYYYMMDD
                     const hDate = new Date(dateStr.substring(0,4), parseInt(dateStr.substring(4,6))-1, dateStr.substring(6,8));
                     
                     if (hDate.getTime() === today.getTime()) {
@@ -253,6 +230,8 @@
                 if (nextHoliday) {
                     const diffDays = Math.ceil((nextHoliday - today) / (1000 * 60 * 60 * 24));
                     document.getElementById('holiday-countdown').innerHTML = `🏖️ 仲有 <b>${diffDays}</b> 日就放假啦！(${holidayName})`;
+                } else {
+                    document.getElementById('holiday-countdown').innerHTML = `🗓️ 期待下一年假期`;
                 }
             } catch (e) {
                 console.error("Holiday API Error:", e);
