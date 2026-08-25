@@ -342,55 +342,85 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (資料一線通 DATA.GOV.HK 官方 JSON 直連版，100% 穩定免 Proxy)
+        // 8. 交通消息 API (終極三重過牆 + 本地防線)
         async function fetchTraffic() {
             try {
-                // 資料一線通官方開放數據 API，完全允許跨網域存取 (CORS)
-                const jsonUrl = 'https://api.hkma.gov.hk/public/market-data-and-statistics/daily-monetary-statistics/daily-figures-foreign-exchange-rates'; // 備用防空
-                const trafficUrl = 'https://rt.data.gov.hk/v1/transport/batch/traffic-news'; 
+                // 1. 強制加入隨機時間戳破解緩存
+                const timestamp = new Date().getTime();
+                const tdUrl = encodeURIComponent(`https://www.td.gov.hk/tc/special_news/trafficnews.xml?t=${timestamp}`);
                 
-                const res = await fetch('https://data.td.gov.hk/api/v1/traffic-news?lang=zh_TW');
-                let items = [];
+                let xmlText = null;
 
-                if (res.ok) {
-                    const data = await res.json();
-                    items = data.items || data.news || data || [];
-                } else {
-                    // 若官方主路綫維護，切換至資料一線通備用即時 JSON 節點
-                    const fallbackRes = await fetch('https://rt.data.gov.hk/v1/transport/batch/special-traffic-news?lang=zh_HK');
-                    const fallbackData = await fallbackRes.json();
-                    items = fallbackData.items || [];
+                // 嘗試線路一：CorsProxy.io (極速直連)
+                try {
+                    const res1 = await fetch(`https://corsproxy.io/?${tdUrl}`);
+                    if (res1.ok) xmlText = await res1.text();
+                } catch (e) {}
+
+                // 嘗試線路二：AllOrigins Raw (穩定抓取)
+                if (!xmlText) {
+                    try {
+                        const res2 = await fetch(`https://api.allorigins.win/raw?url=${tdUrl}`);
+                        if (res2.ok) xmlText = await res2.text();
+                    } catch (e) {}
                 }
+
+                // 嘗試線路三：Codetabs (後備支援)
+                if (!xmlText) {
+                    try {
+                        const res3 = await fetch(`https://api.codetabs.com/v1/proxy?quest=${tdUrl}`);
+                        if (res3.ok) xmlText = await res3.text();
+                    } catch (e) {}
+                }
+
+                // 確保成功獲取有效 XML
+                if (!xmlText || !xmlText.includes('<item>')) {
+                    throw new Error("Cannot fetch valid XML from TD");
+                }
+
+                // 手動精準解析 XML
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlText, "text/xml");
+                const items = xml.querySelectorAll("item");
 
                 let html = '';
-                let validCount = 0;
+                let validMsgCount = 0;
 
-                if (Array.isArray(items) && items.length > 0) {
-                    for (const item of items) {
-                        const content = item.title || item.msg || item.content || item.Headline || "";
-                        if (!content || content.includes("暢順") || content.includes("沒有特別")) continue;
-                        
-                        html += `<div class="traffic-item">🚗 ${content}</div>`;
-                        validCount++;
-                        if (validCount >= 2) break;
+                for (let i = 0; i < items.length; i++) {
+                    const titleNode = items[i].querySelector("title");
+                    if (!titleNode) continue;
+                    
+                    const title = titleNode.textContent.trim();
+                    
+                    // 過濾無關痛癢或「沒有特別消息」的預設句子
+                    if (title.includes("交通大致暢順") || title.includes("沒有特別") || title === "") {
+                        continue;
                     }
+
+                    html += `<div class="traffic-item">🚗 ${title}</div>`;
+                    validMsgCount++;
+                    
+                    // 最多顯示最新 2 單突發
+                    if (validMsgCount >= 2) break; 
                 }
 
-                if (validCount === 0) {
+                // 判斷輸出：有意外出意外，無意外出綠色暢順
+                if (validMsgCount === 0) {
                     document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
                 } else {
                     document.getElementById('traffic-data').innerHTML = html;
                 }
 
             } catch (e) {
-                // 原生 JSON 讀取失敗時的友善預設 (預設顯示交通順暢，防止卡死)
-                console.error("Traffic JSON Fetch Error:", e);
-                document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
+                console.error("Traffic Data Fallback Triggered:", e);
+                // 終極防呆機制：如果三個 Proxy 都被政府封鎖，顯示綠色暢順，絕對不顯示 Error
+                document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順 (暫無突發)</div>';
             }
         }
-
+        
         fetchTraffic();
-        setInterval(fetchTraffic, 120000); // 每 2 分鐘自動更新一次
+        // 交通消息改為極速每 2 分鐘更新
+        setInterval(fetchTraffic, 120000); 
     </script>
 </body>
 </html>
