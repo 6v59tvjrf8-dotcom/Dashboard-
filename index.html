@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <!-- 移除了 viewport-fit=cover，讓 Safari 自行管理狀態欄，徹底解決疊字 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>實時 Dashboard</title>
     <style>
@@ -11,8 +10,7 @@
             font-family: -apple-system, sans-serif; 
             background-color: #fff8f0; 
             margin: 0; 
-            /* 加入固定安全頂部邊距 */
-            padding: max(35px, env(safe-area-inset-top)) 15px max(15px, env(safe-area-inset-bottom)) 15px; 
+            padding: 20px 15px; 
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
@@ -39,10 +37,17 @@
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
         
+        /* 手機版排版優化：硬性留白 75px，完全防止頂部重疊 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
-            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
-            #time { font-size: 2.3em; } 
+            body { 
+                height: auto; 
+                min-height: 100vh; 
+                overflow: auto; 
+                padding-top: 75px !important; 
+                padding-bottom: 40px !important; 
+            }
+            #time { font-size: 2.2em; }
             .bus-panel { max-height: 220px; }
             .news-data-container { max-height: 280px; }
         }
@@ -442,14 +447,11 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (強制 24小時制，引入 Yahoo HK 突發新聞)
+        // 8. 滾動新聞 API (香港時區修復：對 GMT 時間精確校正 +8 小時)
         async function fetchNews() {
             try {
-                // 來源 1: 港台
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
-                // 來源 2: Yahoo HK 焦點新聞 (更新速度極快)
                 const yahooUrl = 'https://hk.news.yahoo.com/rss/hong-kong';
-                // 來源 3: Google News HK
                 const googleUrl = 'https://news.google.com/rss/headlines/section/geo/HK?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
                 
                 const endpoints = [
@@ -474,7 +476,11 @@
                             const data = await res.json();
                             if (data.status === 'ok' && data.items && data.items.length > 0) {
                                 for (let item of data.items) {
-                                    const pubDate = new Date(item.pubDate.replace(/-/g, '/'));
+                                    let pubDate = new Date(item.pubDate.replace(/-/g, '/'));
+                                    // 校正：如果係 Google/Yahoo GMT 時間，修正 8 小時時差
+                                    if (currentSource !== 'rthk') {
+                                        pubDate = new Date(pubDate.getTime() + (8 * 60 * 60 * 1000));
+                                    }
                                     newsList.push({
                                         title: item.title.trim(),
                                         timestamp: isNaN(pubDate.getTime()) ? 0 : pubDate.getTime(),
@@ -531,21 +537,18 @@
                         document.getElementById('news-url-btn').innerText = '🔗 點擊查看港台即時新聞';
                     }
 
-                    // 強制降序排列 (最新必定最頂)
                     newsList.sort((a, b) => b.timestamp - a.timestamp);
 
                     let html = '';
                     for (let news of newsList) {
                         if(!news.title) continue;
                         
-                        // 強制 24小時制 (解決「上午/下午」錯亂問題)
                         let timeStr = '';
                         if (news.timestamp > 0) {
                             timeStr = news.dateObj.toLocaleTimeString('zh-HK', {
-                                timeZone: 'Asia/Hong_Kong',
                                 hour: '2-digit',
                                 minute: '2-digit',
-                                hour12: false // 關鍵：24 小時制
+                                hour12: false
                             });
                         }
 
