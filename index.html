@@ -33,7 +33,7 @@
         .badge-safe { background-color: #f1f2f6; color: #576574; box-shadow: none; border: 1px solid #ced6e0; }
         
         .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; text-align: center; }
-        .weather-item { background: #f8f9fa; padding: 10px 4px; border-radius: 12px; font-size: 0.8em; color: #555; display: flex; flex-direction: column; gap: 4px; border: 1px solid #eee; }
+        .weather-item { background: #f8f9fa; padding: 10px 4px; border-radius: 12px; font-size: 0.8em; color: #555; display: flex; flex-direction: column; justify-content: center; gap: 4px; border: 1px solid #eee; }
         .weather-item b { font-size: 1.15em; color: #2f3542; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         @media (max-width: 768px) { .weather-grid { grid-template-columns: repeat(2, 1fr); } }
 
@@ -53,15 +53,16 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        /* 取消了 min-height，讓它自然縮放 */
-        .traffic-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
-        .traffic-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 6px; line-height: 1.4; }
-        .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .traffic-link-btn { display: block; text-align: center; margin-top: 8px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; }
-        .traffic-link-btn:active { background: #eccc68; color: white; }
+        /* 新聞資訊樣式 */
+        .news-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
+        .news-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.5; }
+        .news-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .news-link-btn { display: block; text-align: center; margin-top: 8px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; }
+        .news-link-btn:active { background: #eccc68; color: white; }
 
         .bible-panel { padding: 12px 15px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
+        /* 音樂按鈕樣式 */
         .audio-panel { padding-top: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -12px; }
         .radio-controls { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 5px; justify-content: center; }
         .radio-btn { flex: 1; min-width: 80px; padding: 8px 10px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.9em; transition: all 0.2s; font-weight: bold; text-align: center; }
@@ -97,7 +98,7 @@
             <div class="weather-grid">
                 <div class="weather-item">💧 相對濕度<br><b id="humidity">--</b></div>
                 <div class="weather-item">☀️ 紫外線<br><b id="uv-index">--</b></div>
-                <div class="weather-item">🌬️ 風速<br><b id="wind-speed">--</b></div>
+                <div class="weather-item" id="wind-box">🌬️ 風速<br><b id="wind-speed">--</b></div>
                 <div class="weather-item">⚡ 雲對地閃電<br><b id="lightning-info" style="font-size: 1.05em;">--</b></div>
             </div>
             
@@ -113,12 +114,12 @@
                 <div id="bus-data">載入中...</div>
             </div>
             
-            <div class="card traffic-panel">
+            <div class="card news-panel">
                 <div>
-                    <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43;">📻 港台交通摘要</h3>
-                    <div id="traffic-data">載入中...</div>
+                    <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43;">📰 即時重點新聞</h3>
+                    <div id="news-data">載入中...</div>
                 </div>
-                <a href="https://programme.rthk.hk/channel/radio/trafficnews/index.php" target="_blank" class="traffic-link-btn">🔗 點擊查看完整港台交通網頁</a>
+                <a href="https://news.rthk.hk/rthk/ch/" target="_blank" class="news-link-btn">🔗 點擊查看港台即時新聞</a>
             </div>
         </div>
     </div>
@@ -202,7 +203,7 @@
         }
         updateBibleVerse();
 
-        // 3. 假期計算 (離線硬編碼，0秒載入)
+        // 3. 假期計算
         function fetchHoliday() {
             const events = [
                 { dtstart: ["20240918"], summary: "中秋節翌日" }, { dtstart: ["20241001"], summary: "國慶日" }, { dtstart: ["20241011"], summary: "重陽節" }, { dtstart: ["20241225"], summary: "聖誕節" }, { dtstart: ["20241226"], summary: "聖誕節後第一個周日" },
@@ -263,56 +264,65 @@
             } catch (e) {}
         }
         
-        // 5. 天文台風速 API (官方直連，優先使用天文台 CORS，無懼 Proxy 封鎖)
+        // 5. 天文台風速/最高陣風自動切換 API
         async function fetchWind() {
             try {
                 const url = 'https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv';
                 
-                // 優先使用官方直連 (加上 cache: no-store 保證最新)
-                const res = await fetch(url, { cache: "no-store" });
+                // 使用官方直連或代理
+                const fetchUrls = [
+                    url,
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}&disableCache=${Date.now()}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+                ];
                 
-                if (res.ok) {
-                    const text = await res.text();
-                    const lines = text.split('\n');
+                let csvText = '';
+                for (let fetchUrl of fetchUrls) {
+                    try {
+                        const res = await fetch(fetchUrl, { cache: "no-store" });
+                        if (res.ok) {
+                            csvText = await res.text();
+                            if (csvText.includes('流浮山')) break;
+                        }
+                    } catch (e) {}
+                }
+
+                if (csvText) {
+                    const lines = csvText.split('\n');
                     let windSpeed = '--';
+                    let isGust = false;
                     
                     for (let line of lines) {
-                        if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('打鼓嶺')) {
+                        if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('天水圍')) {
                             const cols = line.split(',');
-                            // cols[0]: 站名, cols[1]: 風向, cols[2]: 10分鐘平均風速
+                            // cols[2] 係「10分鐘平均風速」, cols[3] 係「最高陣風」
                             if (cols.length >= 3 && cols[2].trim() !== '') {
                                 windSpeed = cols[2].trim() + ' km/h';
+                                break;
+                            } else if (cols.length >= 4 && cols[3].trim() !== '') {
+                                windSpeed = cols[3].trim() + ' km/h';
+                                isGust = true; // 平均風速無資料，轉用最高陣風
                                 break;
                             }
                         }
                     }
-                    document.getElementById('wind-speed').innerText = windSpeed !== '--' ? windSpeed : '微風';
+                    
+                    const windBox = document.getElementById('wind-box');
+                    if (windSpeed !== '--') {
+                        if (isGust) {
+                            // 動態將標題改為「最高陣風」
+                            windBox.innerHTML = `🌬️ 最高陣風<br><b id="wind-speed">${windSpeed}</b>`;
+                        } else {
+                            windBox.innerHTML = `🌬️ 風速<br><b id="wind-speed">${windSpeed}</b>`;
+                        }
+                    } else {
+                        windBox.innerHTML = `🌬️ 風速<br><b id="wind-speed">微風</b>`;
+                    }
                 } else {
-                    throw new Error("直連失敗");
+                    document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed">暫無</b>`;
                 }
             } catch (e) {
-                // 如果官方直連都失敗，先用後備 Proxy
-                try {
-                    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv');
-                    const res2 = await fetch(proxyUrl);
-                    if(res2.ok) {
-                        const text = await res2.text();
-                        const lines = text.split('\n');
-                        let windSpeed = '--';
-                        for (let line of lines) {
-                            if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園')) {
-                                const cols = line.split(',');
-                                if (cols.length >= 3 && cols[2].trim() !== '') {
-                                    windSpeed = cols[2].trim() + ' km/h';
-                                    break;
-                                }
-                            }
-                        }
-                        document.getElementById('wind-speed').innerText = windSpeed !== '--' ? windSpeed : '微風';
-                    }
-                } catch(e2) {
-                    document.getElementById('wind-speed').innerText = '暫無';
-                }
+                document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed">暫無</b>`;
             }
         }
 
@@ -443,42 +453,34 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 9. 交通消息 API
-        async function fetchTraffic() {
+        // 9. 新聞資訊 API (取代交通消息)
+        async function fetchNews() {
             try {
-                const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
-                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
+                // 香港電台 (RTHK) 即時重點新聞 RSS
+                const rthkNewsUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_bnews.xml';
+                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkNewsUrl)}`);
                 const data = await res.json();
 
                 if (data.status !== 'ok' || !data.items) {
-                    throw new Error("數據載入失敗");
+                    throw new Error("新聞載入失敗");
                 }
 
                 let html = '';
-                let validCount = 0;
-
-                for (let i = 0; i < data.items.length; i++) {
+                // 顯示最頂的 3 則重點新聞
+                for (let i = 0; i < Math.min(3, data.items.length); i++) {
                     const title = data.items[i].title.trim();
-                    if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
-
-                    html += `<div class="traffic-item">🚗 ${title}</div>`;
-                    validCount++;
-                    if (validCount >= 2) break;
+                    html += `<div class="news-item">📰 ${title}</div>`;
                 }
 
-                if (validCount === 0) {
-                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-                } else {
-                    document.getElementById('traffic-data').innerHTML = html;
-                }
+                document.getElementById('news-data').innerHTML = html;
 
             } catch (e) {
-                document.getElementById('traffic-data').innerHTML = '<div style="color: #999; font-size: 0.9em;">自動載入摘要失敗，請點擊下方按鈕直接查看。</div>';
+                document.getElementById('news-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入新聞失敗，請點擊下方按鈕查看。</div>';
             }
         }
         
-        fetchTraffic();
-        setInterval(fetchTraffic, 300000); 
+        fetchNews();
+        setInterval(fetchNews, 300000); // 每 5 分鐘更新一次
     </script>
 </body>
 </html>
