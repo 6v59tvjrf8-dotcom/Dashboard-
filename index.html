@@ -9,6 +9,7 @@
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
+        /* 頂部區域 */
         .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
         .time-section { color: #007aff; }
         #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
@@ -17,6 +18,7 @@
         .date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
         #date { font-size: 1.2em; color: #ff6b81; font-weight: bold; line-height: 1; margin: 0; }
         
+        /* Refresh 按鈕 */
         #refresh-btn { background: #f1f2f6; border: none; color: #555; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1em; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         #refresh-btn:active { background: #dfe4ea; transform: scale(0.9); }
         .spin { animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
@@ -26,18 +28,25 @@
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
         
+        /* 手機版排版優化：加入強制最高高度限制，激活內部滾動條 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
             body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
             #time { font-size: 2.3em; } 
+            
+            /* 【關鍵修復】限制手機版巴士及新聞的高度，強迫出現滾動條 */
+            .bus-panel { max-height: 220px; }
+            .news-data-container { max-height: 280px; }
         }
         
+        /* 天氣區域 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
         .temp { font-size: 3.5em; font-weight: bold; color: #ff9f43; margin: 5px 0; line-height: 1; }
         #weather-warnings { min-height: 25px; margin-bottom: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
         .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.85em; font-weight: bold; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
         .badge-safe { background-color: #f1f2f6; color: #576574; box-shadow: none; border: 1px solid #ced6e0; }
         
+        /* 四宮格 */
         .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; text-align: center; }
         .weather-item { background: #f8f9fa; padding: 10px 4px; border-radius: 12px; font-size: 0.8em; color: #555; display: flex; flex-direction: column; justify-content: center; gap: 4px; border: 1px solid #eee; }
         .weather-item b { font-size: 1.15em; color: #2f3542; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -50,7 +59,8 @@
         .right-column { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
         @media (max-width: 768px) { .right-column { overflow: visible; } }
         
-        .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; max-height: 50%; }
+        /* 巴士區域 */
+        .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; min-width: 120px; }
         .bus-route { background: #0097e6; color: white; padding: 4px 10px; border-radius: 8px; font-weight: bold; font-size: 1.05em; white-space: nowrap; }
@@ -59,7 +69,7 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        /* 滾動新聞區塊專屬樣式 */
+        /* 滾動新聞區域 */
         .news-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 250px; }
         .news-data-container { flex: 1; overflow-y: auto; margin-bottom: 10px; padding-right: 5px; }
         .news-data-container::-webkit-scrollbar { width: 4px; }
@@ -73,6 +83,7 @@
         .news-link-btn { display: block; text-align: center; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; flex-shrink: 0; }
         .news-link-btn:active { background: #eccc68; color: white; }
 
+        /* 底部模塊 */
         .bible-panel { padding: 12px 15px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
         .audio-panel { padding-top: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -12px; }
@@ -133,7 +144,7 @@
             
             <div class="card news-panel">
                 <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43; flex-shrink: 0;">📰 即時重點新聞</h3>
-                <!-- 可獨立上下滑動的新聞顯示區 -->
+                <!-- 加入特定容器，配合 CSS max-height 自動產生滾動條 -->
                 <div id="news-data" class="news-data-container">載入中...</div>
                 <a href="https://news.rthk.hk/rthk/ch/" target="_blank" class="news-link-btn">🔗 點擊查看港台即時新聞</a>
             </div>
@@ -428,7 +439,7 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (取消 12 小時過濾，顯示港台 RSS 內所有新聞)
+        // 8. 滾動新聞 API (所有重點新聞全數顯示)
         async function fetchNews() {
             try {
                 const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
@@ -451,7 +462,6 @@
                             const data = await res.json();
                             if (data.items && data.items.length > 0) {
                                 for (let item of data.items) {
-                                    // 格式化發佈時間 [HH:MM]
                                     const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
                                     const timeStr = isNaN(pubDate.getTime()) ? '' : pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
                                     const timeTag = timeStr ? `<span class="news-time">[${timeStr}]</span> ` : '';
