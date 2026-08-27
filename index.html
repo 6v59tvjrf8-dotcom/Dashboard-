@@ -3,10 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 加入 viewport-fit=cover 確保支援 iPhone 安全區域 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>實時 Dashboard</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100vh; box-sizing: border-box; overflow: hidden; }
+        /* 加入 env(safe-area-inset-top) 避開 iPhone 頂部系統時間及動態島 */
+        body { 
+            font-family: -apple-system, sans-serif; 
+            background-color: #fff8f0; 
+            margin: 0; 
+            padding: max(15px, env(safe-area-inset-top)) 15px max(15px, env(safe-area-inset-bottom)) 15px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            height: 100vh; 
+            box-sizing: border-box; 
+            overflow: hidden; 
+        }
         .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
         .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
@@ -429,30 +442,32 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (終極 JSON 轉換與防緩存，徹底放棄 rss2json)
+        // 8. 滾動新聞 API (還原乾淨 URL 防 404，完全依賴 Proxy 內建防快取指令，並確保最新排序)
         async function fetchNews() {
             try {
-                // 產生獨一無二的隨機時間戳，徹底擊碎伺服器緩存
-                const cacheBuster = Date.now();
-                const rthkUrl = `https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml?_nocache=${cacheBuster}`;
-                const encodedUrl = encodeURIComponent(rthkUrl);
+                // 1. 原版乾淨 URL，確保港台伺服器唔會當係惡意連結而回傳 404
+                const targetUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
+                const encodedUrl = encodeURIComponent(targetUrl);
                 
-                // 完全放棄快取嚴重的 API，轉用專門將 XML 轉成純 JSON 的代理，避開 Safari CORB 封鎖
-                const urlsToTry = [
-                    `https://api.rss2json.com/v1/api.json?rss_url=${encodedUrl}`, // 加上了偽裝參數強逼更新
-                    `https://api.factmaven.com/xml-to-json/?xml=${encodedUrl}`,
-                    `https://api.allorigins.win/get?url=${encodedUrl}`
+                // 2. 將破快取 (Cache Busting) 任務交俾代理伺服器
+                const proxies = [
+                    // 首選：AllOrigins (加入 disableCache=true 參數，並回傳安全的 JSON Wrapper)
+                    `https://api.allorigins.win/get?url=${encodedUrl}&disableCache=true`,
+                    // 備用 1：CodeTabs (直接穿透，回傳 Raw XML)
+                    `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`,
+                    // 備用 2：rss2json (有快取延遲問題，最後防線)
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodedUrl}`
                 ];
 
                 let newsList = [];
                 let fetchSuccess = false;
                 
-                for (let url of urlsToTry) {
+                for (let proxy of proxies) {
                     try {
-                        const res = await fetch(url, { cache: "no-store" });
+                        const res = await fetch(proxy, { cache: "no-store" });
                         if (!res.ok) continue;
                         
-                        if (url.includes('rss2json')) {
+                        if (proxy.includes('rss2json')) {
                             const data = await res.json();
                             if (data.items && data.items.length > 0) {
                                 for (let item of data.items) {
@@ -466,26 +481,18 @@
                                 fetchSuccess = true;
                                 break; 
                             }
-                        } else if (url.includes('factmaven')) {
-                            const data = await res.json();
-                            if (data && data.rss && data.rss.channel && data.rss.channel.item) {
-                                const items = Array.isArray(data.rss.channel.item) ? data.rss.channel.item : [data.rss.channel.item];
-                                for (let item of items) {
-                                    const pubDate = new Date(item.pubDate);
-                                    newsList.push({
-                                        title: (item.title || "").trim(),
-                                        timestamp: isNaN(pubDate.getTime()) ? 0 : pubDate.getTime(),
-                                        timeStr: isNaN(pubDate.getTime()) ? '' : pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'})
-                                    });
-                                }
-                                fetchSuccess = true;
-                                break;
+                        } else {
+                            let xmlText = '';
+                            if (proxy.includes('allorigins')) {
+                                const data = await res.json();
+                                xmlText = data.contents;
+                            } else {
+                                xmlText = await res.text();
                             }
-                        } else if (url.includes('allorigins')) {
-                            const data = await res.json();
-                            if (data.contents && data.contents.includes('<item>')) {
+
+                            if (xmlText && xmlText.includes('<item>')) {
                                 const parser = new DOMParser();
-                                const xml = parser.parseFromString(data.contents, "text/xml");
+                                const xml = parser.parseFromString(xmlText, "text/xml");
                                 const items = xml.querySelectorAll("item");
                                 for (let i = 0; i < items.length; i++) {
                                     const titleNode = items[i].querySelector("title");
@@ -513,7 +520,7 @@
                             }
                         }
                     } catch (e) {
-                        console.warn("Proxy fallback triggered...");
+                        console.warn("Proxy failed:", proxy);
                     }
                 }
 
