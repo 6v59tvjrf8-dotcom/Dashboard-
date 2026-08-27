@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- 移除了 viewport-fit=cover，讓 Safari 自行管理狀態欄，徹底解決疊字 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>實時 Dashboard</title>
     <style>
         body { 
             font-family: -apple-system, sans-serif; 
             background-color: #fff8f0; 
             margin: 0; 
-            padding: 15px; 
+            /* 加入固定安全頂部邊距 */
+            padding: max(35px, env(safe-area-inset-top)) 15px max(15px, env(safe-area-inset-bottom)) 15px; 
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
@@ -20,16 +22,7 @@
         }
         .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* 頂部區域：強制 margin-top 避開動態島與系統時間 */
-        .header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            flex-shrink: 0; 
-            gap: 10px; 
-            margin-top: env(safe-area-inset-top, 20px);
-        }
-
+        .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
         .time-section { color: #007aff; }
         #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
         .date-section { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
@@ -48,15 +41,7 @@
         
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
-            body { 
-                height: auto; 
-                min-height: 100vh; 
-                overflow: auto; 
-                padding-bottom: 40px !important; 
-            }
-            .header {
-                margin-top: 45px !important; /* 手機版硬推 45px 防疊字 */
-            }
+            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
             #time { font-size: 2.3em; } 
             .bus-panel { max-height: 220px; }
             .news-data-container { max-height: 280px; }
@@ -97,7 +82,7 @@
         
         .news-item { font-size: 0.9em; color: #444; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
         .news-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .news-time { color: #888; font-size: 0.85em; margin-right: 5px; font-weight: bold; }
+        .news-time { color: #007aff; font-size: 0.85em; margin-right: 5px; font-weight: 600; font-family: monospace; }
         
         .news-link-btn { display: block; text-align: center; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; flex-shrink: 0; }
         .news-link-btn:active { background: #eccc68; color: white; }
@@ -457,15 +442,19 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (時間修復：精準鎖定香港時區 UTC+8)
+        // 8. 滾動新聞 API (強制 24小時制，引入 Yahoo HK 突發新聞)
         async function fetchNews() {
             try {
+                // 來源 1: 港台
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
+                // 來源 2: Yahoo HK 焦點新聞 (更新速度極快)
+                const yahooUrl = 'https://hk.news.yahoo.com/rss/hong-kong';
+                // 來源 3: Google News HK
                 const googleUrl = 'https://news.google.com/rss/headlines/section/geo/HK?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
                 
                 const endpoints = [
-                    `https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=true`,
-                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`,
+                    `https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=${Date.now()}`,
+                    `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}&disableCache=${Date.now()}`,
                     `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(googleUrl)}`
                 ];
 
@@ -475,9 +464,8 @@
                 
                 for (let endpoint of endpoints) {
                     try {
-                        if (endpoint.includes(encodeURIComponent(googleUrl))) {
-                            currentSource = 'google';
-                        }
+                        if (endpoint.includes(encodeURIComponent(googleUrl))) currentSource = 'google';
+                        if (endpoint.includes(encodeURIComponent(yahooUrl))) currentSource = 'yahoo';
                         
                         const res = await fetch(endpoint, { cache: "no-store" });
                         if (!res.ok) continue;
@@ -486,11 +474,7 @@
                             const data = await res.json();
                             if (data.status === 'ok' && data.items && data.items.length > 0) {
                                 for (let item of data.items) {
-                                    // 精準時間解析：將字串轉為合法 Date 物件
-                                    let parseStr = item.pubDate;
-                                    if (typeof parseStr === 'string') parseStr = parseStr.replace(/-/g, '/');
-                                    const pubDate = new Date(parseStr);
-                                    
+                                    const pubDate = new Date(item.pubDate.replace(/-/g, '/'));
                                     newsList.push({
                                         title: item.title.trim(),
                                         timestamp: isNaN(pubDate.getTime()) ? 0 : pubDate.getTime(),
@@ -533,32 +517,35 @@
                 }
 
                 if (fetchSuccess && newsList.length > 0) {
-                    // 動態更改標題與連結
                     if (currentSource === 'google') {
                         document.getElementById('news-title').innerHTML = '📰 Google 香港焦點新聞';
                         document.getElementById('news-url-btn').href = 'https://news.google.com/?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
                         document.getElementById('news-url-btn').innerText = '🔗 點擊查看 Google News';
+                    } else if (currentSource === 'yahoo') {
+                        document.getElementById('news-title').innerHTML = '📰 Yahoo 香港即時新聞';
+                        document.getElementById('news-url-btn').href = 'https://hk.news.yahoo.com/hong-kong';
+                        document.getElementById('news-url-btn').innerText = '🔗 點擊查看 Yahoo 新聞';
                     } else {
                         document.getElementById('news-title').innerHTML = '📰 港台即時重點新聞';
                         document.getElementById('news-url-btn').href = 'https://news.rthk.hk/rthk/ch/';
                         document.getElementById('news-url-btn').innerText = '🔗 點擊查看港台即時新聞';
                     }
 
-                    // 強制降序排列 (最新時間必定排喺最頂)
+                    // 強制降序排列 (最新必定最頂)
                     newsList.sort((a, b) => b.timestamp - a.timestamp);
 
                     let html = '';
                     for (let news of newsList) {
                         if(!news.title) continue;
                         
-                        // 香港時區 (Asia/Hong_Kong) 精準格式化，解決「下午變上午」的問題
+                        // 強制 24小時制 (解決「上午/下午」錯亂問題)
                         let timeStr = '';
                         if (news.timestamp > 0) {
                             timeStr = news.dateObj.toLocaleTimeString('zh-HK', {
                                 timeZone: 'Asia/Hong_Kong',
                                 hour: '2-digit',
                                 minute: '2-digit',
-                                hour12: true
+                                hour12: false // 關鍵：24 小時制
                             });
                         }
 
@@ -567,7 +554,7 @@
                     }
                     document.getElementById('news-data').innerHTML = html;
                 } else {
-                    throw new Error("所有新聞來源及代理均失效");
+                    throw new Error("所有新聞來源均失效");
                 }
 
             } catch (e) {
