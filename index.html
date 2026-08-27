@@ -51,7 +51,6 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        /* 新聞資訊樣式 */
         .news-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
         .news-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.5; }
         .news-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -158,6 +157,37 @@
             document.getElementById('stop-btn').classList.add('active');
         }
 
+        // ====== JSONP 終極穿牆核心工具 ======
+        const fetchJSONP = (url) => {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+                const script = document.createElement('script');
+                
+                const timeoutId = setTimeout(() => {
+                    cleanUp();
+                    reject(new Error('JSONP 連線超時'));
+                }, 8000);
+
+                const cleanUp = () => {
+                    if (window[callbackName]) delete window[callbackName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    clearTimeout(timeoutId);
+                };
+
+                window[callbackName] = function(data) {
+                    cleanUp();
+                    resolve(data);
+                };
+                
+                script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
+                script.onerror = () => {
+                    cleanUp();
+                    reject(new Error('JSONP 被阻擋'));
+                };
+                document.body.appendChild(script);
+            });
+        };
+
         // 1. 實時時鐘
         function updateClock() {
             const now = new Date();
@@ -261,26 +291,23 @@
             } catch (e) {}
         }
         
-        // 5. 天文台風速/最高陣風 (使用 AllOrigins 嘅 GET 模式，將 CSV 變 JSON，繞過防火牆)
+        // 5. 風速/最高陣風 (使用 JSONP + AllOrigins 完全繞過攔截)
         async function fetchWind() {
             try {
-                const url = 'https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv';
+                const csvUrl = 'https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv';
                 let csvText = '';
                 
-                // 優先使用 JSON Wrapper 模式，避免 Safari 阻擋 raw text
+                // 第一嘗試：常規直接 Fetch (某啲網絡可能通行)
                 try {
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&disableCache=${Date.now()}`;
-                    const res = await fetch(proxyUrl);
-                    if (res.ok) {
-                        const data = await res.json();
-                        csvText = data.contents;
-                    }
+                    const res = await fetch(csvUrl, { cache: "no-store" });
+                    if (res.ok) csvText = await res.text();
                 } catch(e) {}
-                
-                // 如果失敗再試直連
+
+                // 第二嘗試：終極 JSONP 穿牆術
                 if (!csvText) {
-                    const res2 = await fetch(url, { cache: "no-store" });
-                    if (res2.ok) { csvText = await res2.text(); }
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}&disableCache=${Date.now()}`;
+                    const data = await fetchJSONP(proxyUrl);
+                    if (data && data.contents) csvText = data.contents;
                 }
 
                 if (csvText) {
@@ -291,14 +318,10 @@
                     for (let line of lines) {
                         if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('天水圍')) {
                             const cols = line.split(',');
-                            // cols[2]: 平均風速, cols[3]: 最高陣風
                             if (cols.length >= 3 && cols[2].trim() !== '') {
-                                windSpeed = cols[2].trim() + ' km/h';
-                                break;
+                                windSpeed = cols[2].trim() + ' km/h'; break;
                             } else if (cols.length >= 4 && cols[3].trim() !== '') {
-                                windSpeed = cols[3].trim() + ' km/h';
-                                isGust = true; 
-                                break;
+                                windSpeed = cols[3].trim() + ' km/h'; isGust = true; break;
                             }
                         }
                     }
@@ -444,48 +467,26 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 9. 即時新聞 API (港台新聞，同樣用 JSON 包裝以穿透 Firewall)
+        // 9. 即時重點新聞 (使用 RSS2JSON + JSONP 穿牆技術)
         async function fetchNews() {
             try {
-                // 港台本地新聞 RSS 原檔
                 const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
-                let xmlText = '';
-
-                // 使用 AllOrigins GET 模式，將 XML 轉換為 JSON 繞過限制
-                try {
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}&disableCache=${Date.now()}`;
-                    const res = await fetch(proxyUrl);
-                    if (res.ok) {
-                        const data = await res.json();
-                        xmlText = data.contents;
-                    }
-                } catch(e) {}
-
-                if (!xmlText || !xmlText.includes('<item>')) {
-                    throw new Error("無法連接港台新聞");
-                }
-
-                // 成功取得資料後，手動解析 XML
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(xmlText, "text/xml");
-                const items = xml.querySelectorAll("item");
+                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
                 
-                let html = '';
-                let count = 0;
+                // 強制使用 JSONP 腳本載入，突破所有 API Fetch 的封鎖
+                const data = await fetchJSONP(apiUrl);
 
-                for (let i = 0; i < items.length; i++) {
-                    const titleNode = items[i].querySelector("title");
-                    if (!titleNode) continue;
-                    
-                    let title = titleNode.textContent.trim();
-                    html += `<div class="news-item">📰 ${title}</div>`;
-                    count++;
-                    
-                    // 顯示最新 3 條新聞
-                    if (count >= 3) break; 
+                if (!data || data.status !== 'ok' || !data.items) {
+                    throw new Error("新聞載入失敗");
                 }
 
-                if (count > 0) {
+                let html = '';
+                for (let i = 0; i < Math.min(3, data.items.length); i++) {
+                    const title = data.items[i].title.trim();
+                    html += `<div class="news-item">📰 ${title}</div>`;
+                }
+
+                if (html !== '') {
                     document.getElementById('news-data').innerHTML = html;
                 } else {
                     throw new Error("無新聞資料");
@@ -497,7 +498,7 @@
         }
         
         fetchNews();
-        setInterval(fetchNews, 300000); // 每 5 分鐘更新一次
+        setInterval(fetchNews, 300000); // 每 5 分鐘更新
     </script>
 </body>
 </html>
