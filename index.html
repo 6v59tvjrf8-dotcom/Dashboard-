@@ -62,7 +62,6 @@
         /* 滾動新聞區塊專屬樣式 */
         .news-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 250px; }
         .news-data-container { flex: 1; overflow-y: auto; margin-bottom: 10px; padding-right: 5px; }
-        /* 美化滾動條 */
         .news-data-container::-webkit-scrollbar { width: 4px; }
         .news-data-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         .news-data-container::-webkit-scrollbar-thumb { background: #dcdde1; border-radius: 4px; }
@@ -133,7 +132,7 @@
             </div>
             
             <div class="card news-panel">
-                <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43; flex-shrink: 0;">📰 12小時內重點新聞</h3>
+                <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43; flex-shrink: 0;">📰 即時重點新聞</h3>
                 <!-- 可獨立上下滑動的新聞顯示區 -->
                 <div id="news-data" class="news-data-container">載入中...</div>
                 <a href="https://news.rthk.hk/rthk/ch/" target="_blank" class="news-link-btn">🔗 點擊查看港台即時新聞</a>
@@ -429,7 +428,7 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (過濾 12 小時內)
+        // 8. 滾動新聞 API (取消 12 小時過濾，顯示港台 RSS 內所有新聞)
         async function fetchNews() {
             try {
                 const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
@@ -441,7 +440,6 @@
                 ];
 
                 let html = '';
-                const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); // 12小時前的 Timestamp
                 let addedCount = 0;
                 
                 for (let url of urlsToTry) {
@@ -453,13 +451,13 @@
                             const data = await res.json();
                             if (data.items && data.items.length > 0) {
                                 for (let item of data.items) {
-                                    // 確保 Date 能在 Safari 正確解析
+                                    // 格式化發佈時間 [HH:MM]
                                     const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
-                                    if (pubDate.getTime() >= twelveHoursAgo) {
-                                        const timeStr = pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
-                                        html += `<div class="news-item"><span class="news-time">[${timeStr}]</span> ${item.title.trim()}</div>`;
-                                        addedCount++;
-                                    }
+                                    const timeStr = isNaN(pubDate.getTime()) ? '' : pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
+                                    const timeTag = timeStr ? `<span class="news-time">[${timeStr}]</span> ` : '';
+                                    
+                                    html += `<div class="news-item">${timeTag}${item.title.trim()}</div>`;
+                                    addedCount++;
                                 }
                                 break; 
                             }
@@ -472,13 +470,17 @@
                                 for (let i = 0; i < items.length; i++) {
                                     const titleNode = items[i].querySelector("title");
                                     const pubDateNode = items[i].querySelector("pubDate");
-                                    if (titleNode && pubDateNode) {
-                                        const pubDate = new Date(pubDateNode.textContent.trim());
-                                        if (pubDate.getTime() >= twelveHoursAgo) {
-                                            const timeStr = pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
-                                            html += `<div class="news-item"><span class="news-time">[${timeStr}]</span> ${titleNode.textContent.trim()}</div>`;
-                                            addedCount++;
+                                    if (titleNode) {
+                                        let timeTag = '';
+                                        if (pubDateNode) {
+                                            const pubDate = new Date(pubDateNode.textContent.trim());
+                                            if (!isNaN(pubDate.getTime())) {
+                                                const timeStr = pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
+                                                timeTag = `<span class="news-time">[${timeStr}]</span> `;
+                                            }
                                         }
+                                        html += `<div class="news-item">${timeTag}${titleNode.textContent.trim()}</div>`;
+                                        addedCount++;
                                     }
                                 }
                                 if (addedCount > 0) break; 
@@ -489,8 +491,6 @@
 
                 if (html !== '') {
                     document.getElementById('news-data').innerHTML = html;
-                } else if (addedCount === 0) {
-                    document.getElementById('news-data').innerHTML = '<div style="color: #999; font-size: 0.9em; text-align: center; padding: 20px 0;">目前暫無 12 小時內的突發新聞</div>';
                 } else {
                     throw new Error("全部代理失效");
                 }
