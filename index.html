@@ -26,10 +26,17 @@
         
         /* 天氣樣式 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
-        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; }
-        #weather-warnings { min-height: 25px; margin-bottom: 5px; }
-        .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.9em; font-weight: bold; margin-right: 5px; margin-bottom: 5px; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
+        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; line-height: 1; }
+        #weather-warnings { min-height: 25px; margin-bottom: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.9em; font-weight: bold; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
+        .badge-safe { background-color: #f1f2f6; color: #576574; box-shadow: none; border: 1px solid #ced6e0; } /* 沒有警告時的灰色標籤 */
         
+        /* 全新：四宮格天氣數據面板 */
+        .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0; text-align: center; }
+        .weather-item { background: #f8f9fa; padding: 12px 5px; border-radius: 12px; font-size: 0.85em; color: #555; display: flex; flex-direction: column; gap: 5px; border: 1px solid #eee; }
+        .weather-item b { font-size: 1.25em; color: #2f3542; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        @media (max-width: 768px) { .weather-grid { grid-template-columns: repeat(2, 1fr); } }
+
         .forecast-container { margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
         .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; }
         #forecast-desc { font-size: 0.95em; color: #555; line-height: 1.5; }
@@ -51,12 +58,9 @@
         .eta-exact { font-size: 0.85em; color: #888; margin-top: 2px; }
         
         /* 交通消息樣式 */
-        .traffic-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; max-height: 35%; }
-        .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
-        .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .traffic-link-btn { display: block; text-align: center; margin-top: 10px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.95em; transition: all 0.2s; }
-        .traffic-link-btn:active { background: #eccc68; color: white; }
-
+        .traffic-panel { display: flex; flex-direction: column; flex: 1; min-height: 220px; padding: 15px; }
+        .iframe-container { flex: 1; border-radius: 10px; overflow: hidden; border: 1px solid #eee; background: #f9f9f9; position: relative; }
+        
         /* 聖經金句區塊 */
         .bible-panel { padding: 15px 20px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
@@ -86,9 +90,20 @@
     <div class="content">
         <div class="card weather-panel">
             <h3 style="margin-top:0;">☀️ 元朗區實時天氣</h3>
-            <div id="weather-warnings"></div> 
+            
+            <div id="weather-warnings">
+                <!-- 警告標籤會在此生成 -->
+            </div> 
+            
             <div class="temp"><span id="temperature">--</span>°C</div>
-            <p style="margin: 0;">💧 相對濕度: <span id="humidity">--</span>%</p>
+            
+            <!-- 全新：四宮格氣象數據 -->
+            <div class="weather-grid">
+                <div class="weather-item">💧 相對濕度<br><b id="humidity">--</b></div>
+                <div class="weather-item">☀️ 紫外線<br><b id="uv-index">--</b></div>
+                <div class="weather-item">🌬️ 風速<br><b id="wind-speed">--</b></div>
+                <div class="weather-item">⚡ 雲對地閃電<br><b id="lightning-info" style="font-size: 1.1em;">--</b></div>
+            </div>
             
             <div class="forecast-container">
                 <h4>📝 本港地區天氣預測</h4>
@@ -102,12 +117,12 @@
                 <div id="bus-data">載入中...</div>
             </div>
             
+            <!-- 交通消息直嵌網頁區塊 -->
             <div class="card traffic-panel">
-                <div>
-                    <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">📻 港台交通摘要</h3>
-                    <div id="traffic-data">載入中...</div>
+                <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43; margin-bottom: 10px;">📻 港台即時交通消息</h3>
+                <div class="iframe-container">
+                    <iframe src="https://programme.rthk.hk/channel/radio/trafficnews/index.php" style="width: 100%; height: 100%; border: none;"></iframe>
                 </div>
-                <a href="https://programme.rthk.hk/channel/radio/trafficnews/index.php" target="_blank" class="traffic-link-btn">🔗 點擊查看完整港台交通網頁</a>
             </div>
         </div>
     </div>
@@ -236,19 +251,69 @@
         }
         fetchHoliday();
 
-        // 4. 天文台天氣 API
+        // 4. 天文台天氣 API (包含溫度、濕度、紫外線、閃電)
         async function fetchWeather() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
                 const data = await res.json();
+                
+                // 溫度
                 const yuenLongTemp = data.temperature.data.find(d => d.place === '元朗公園').value;
-                const humidity = data.humidity.data[0].value;
                 document.getElementById('temperature').innerText = yuenLongTemp;
-                document.getElementById('humidity').innerText = humidity;
+                
+                // 濕度
+                const humidity = data.humidity.data[0].value;
+                document.getElementById('humidity').innerText = humidity + '%';
+
+                // 紫外線指數
+                if (data.uvindex && data.uvindex.data && data.uvindex.data.length > 0) {
+                    const uvVal = data.uvindex.data[0].value;
+                    const uvDesc = data.uvindex.data[0].desc;
+                    document.getElementById('uv-index').innerHTML = `${uvVal} <span style="font-size:0.7em">(${uvDesc})</span>`;
+                } else {
+                    document.getElementById('uv-index').innerText = '0 (低)';
+                }
+
+                // 雲對地閃電資訊
+                let lightningStr = '沒有';
+                if (data.lightning && data.lightning.data) {
+                    const activePlaces = data.lightning.data.filter(d => d.occur === "true").map(d => d.place);
+                    if (activePlaces.length > 0) {
+                        lightningStr = `有 (${activePlaces[0]})`; // 顯示首個有閃電的地區
+                    }
+                }
+                document.getElementById('lightning-info').innerText = lightningStr;
+
             } catch (e) {}
         }
         
-        // 5. 天文台預測 API
+        // 5. 天文台風速 API (從地區氣象站 CSV 讀取 10分鐘平均風速)
+        async function fetchWind() {
+            try {
+                const res = await fetch('https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv');
+                if (res.ok) {
+                    const text = await res.text();
+                    const lines = text.split('\n');
+                    let windSpeed = '--';
+                    
+                    // 尋找元朗區鄰近嘅測風站 (流浮山 / 濕地公園 / 元朗公園)
+                    for (let line of lines) {
+                        if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園')) {
+                            const cols = line.split(',');
+                            if (cols.length >= 4 && cols[3].trim() !== '') {
+                                windSpeed = cols[3].trim() + ' km/h';
+                                break;
+                            }
+                        }
+                    }
+                    if (windSpeed !== '--') {
+                        document.getElementById('wind-speed').innerText = windSpeed;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // 6. 天文台預測 API
         async function fetchForecast() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc');
@@ -257,75 +322,68 @@
             } catch (e) {}
         }
 
-        // 6. 天文台警告 API (已整合：常規天氣警告 + 實時工作暑熱警告)
+        // 7. 天文台及勞工處綜合警告 API (必顯示暑熱狀態)
         async function fetchWarnings() {
             try {
                 let warningHtml = '';
                 const warningContainer = document.getElementById('weather-warnings');
 
-                // A. 讀取天文台常規天氣警告 (如雷暴、酷熱等)
+                // A. 讀取天文台常規警告 (雷暴、酷熱等)
                 try {
-                    const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc');
-                    if (res.ok) {
-                        const data = await res.json();
-                        for (const key in data) {
-                            if (data[key].name) { 
-                                warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`; 
+                    const warnRes = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc');
+                    if (warnRes.ok) {
+                        const warnData = await warnRes.json();
+                        for (const key in warnData) {
+                            if (warnData[key].name) { 
+                                warningHtml += `<span class="warning-badge">⚠️ ${warnData[key].name}</span>`; 
                             }
                         }
                     }
                 } catch (e) {}
 
-                // B. 讀取勞工處實時工作暑熱警告 API (智能字眼匹配，防死機設計)
+                // B. 讀取工作暑熱警告 (無論有無生效都會顯示狀態)
+                let hswwBadge = `<span class="warning-badge badge-safe">✅ 沒有工作暑熱警告</span>`;
                 try {
                     const hswwRes = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/hsww.php?lang=tc');
                     if (hswwRes.ok) {
                         const hswwText = await hswwRes.text();
-                        
-                        // 確保有資料傳回，並且不是空物件
                         if (hswwText && hswwText.trim() !== '{}' && hswwText.trim() !== '') {
-                            const strData = hswwText.toUpperCase(); 
-                            
-                            // 防呆機制：預防 API 包含「取消」或「CANCEL」之歷史記錄
+                            const strData = hswwText.toUpperCase();
                             if (!strData.includes("CANCEL") && !strData.includes("取消")) {
-                                let hswwLevel = '';
-                                let badgeColor = '';
-
                                 if (strData.includes("黑") || strData.includes("BLACK")) {
-                                    hswwLevel = "黑色工作暑熱警告";
-                                    badgeColor = "#2f3542"; // 型格深黑色
+                                    hswwBadge = `<span class="warning-badge" style="background-color: #2f3542; color: white;">🥵 黑色工作暑熱警告</span>`;
                                 } else if (strData.includes("紅") || strData.includes("RED")) {
-                                    hswwLevel = "紅色工作暑熱警告";
-                                    badgeColor = "#ff4757"; // 警告紅色
+                                    hswwBadge = `<span class="warning-badge" style="background-color: #ff4757; color: white;">🥵 紅色工作暑熱警告</span>`;
                                 } else if (strData.includes("黃") || strData.includes("AMBER") || strData.includes("YELLOW")) {
-                                    hswwLevel = "黃色工作暑熱警告";
-                                    badgeColor = "#f39c12"; // 較深黃色，確保白色字體對比度
+                                    hswwBadge = `<span class="warning-badge" style="background-color: #f39c12; color: white;">🥵 黃色工作暑熱警告</span>`;
                                 } else if (strData.includes("暑熱") || strData.includes("HEAT")) {
-                                    hswwLevel = "工作暑熱警告生效";
-                                    badgeColor = "#e67e22"; // 預防格式變更的橙色後備
-                                }
-
-                                // 智能防重覆機制：如果天文台常規警告將來合併咗「暑熱」字眼，就唔好重覆顯示
-                                if (hswwLevel && !warningHtml.includes("暑熱")) {
-                                    warningHtml += `<span class="warning-badge" style="background-color: ${badgeColor}; box-shadow: 0 2px 5px ${badgeColor}80;">🥵 ${hswwLevel}</span>`;
+                                    hswwBadge = `<span class="warning-badge" style="background-color: #e67e22; color: white;">🥵 工作暑熱警告生效</span>`;
                                 }
                             }
                         }
                     }
-                } catch (e) {
-                    console.error("暑熱警告讀取失敗", e);
+                } catch (e) {}
+
+                // 如果常規警告無包含「暑熱」字眼，才加入獨立的暑熱標籤防重疊
+                if (!warningHtml.includes("暑熱")) {
+                    warningHtml += hswwBadge;
                 }
 
                 warningContainer.innerHTML = warningHtml;
-            } catch (e) { 
-                console.error('整體警告載入失敗'); 
-            }
+            } catch (e) {}
         }
 
-        fetchWeather(); fetchForecast(); fetchWarnings();
-        setInterval(() => { fetchWeather(); fetchForecast(); fetchWarnings(); }, 600000); 
+        // 啟動所有氣象數據讀取
+        function updateAllWeather() {
+            fetchWeather();
+            fetchWind();
+            fetchForecast();
+            fetchWarnings();
+        }
+        updateAllWeather();
+        setInterval(updateAllWeather, 600000); 
 
-        // 7. 九巴 API 
+        // 8. 九巴 API 
         async function fetchBus() {
             try {
                 const [outRes, inRes] = await Promise.all([
@@ -387,42 +445,6 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API (最穩定寫法 + 一鍵直達按鈕)
-        async function fetchTraffic() {
-            try {
-                const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
-                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`);
-                const data = await res.json();
-
-                if (data.status !== 'ok' || !data.items) {
-                    throw new Error("數據載入失敗");
-                }
-
-                let html = '';
-                let validCount = 0;
-
-                for (let i = 0; i < data.items.length; i++) {
-                    const title = data.items[i].title.trim();
-                    if (!title || title.includes("大致暢順") || title.includes("沒有特別")) continue;
-
-                    html += `<div class="traffic-item">🚗 ${title}</div>`;
-                    validCount++;
-                    if (validCount >= 2) break;
-                }
-
-                if (validCount === 0) {
-                    document.getElementById('traffic-data').innerHTML = '<div style="color: #2ed573; font-weight: bold;">✅ 目前全港交通大致暢順</div>';
-                } else {
-                    document.getElementById('traffic-data').innerHTML = html;
-                }
-
-            } catch (e) {
-                document.getElementById('traffic-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入摘要失敗，請點擊下方按鈕直接查看。</div>';
-            }
-        }
-        
-        fetchTraffic();
-        setInterval(fetchTraffic, 300000); 
     </script>
 </body>
 </html>
