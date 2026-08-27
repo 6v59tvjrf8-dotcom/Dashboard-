@@ -20,7 +20,16 @@
         }
         .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
+        /* 頂部區域：強制 margin-top 避開動態島與系統時間 */
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            flex-shrink: 0; 
+            gap: 10px; 
+            margin-top: env(safe-area-inset-top, 20px);
+        }
+
         .time-section { color: #007aff; }
         #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
         .date-section { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
@@ -37,11 +46,17 @@
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
         
-        /* 手機版排版優化：針對 header 進行硬推，解決疊字問題 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
-            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
-            .header { margin-top: 45px; } /* 物理硬推，避開所有頂部狀態欄 */
+            body { 
+                height: auto; 
+                min-height: 100vh; 
+                overflow: auto; 
+                padding-bottom: 40px !important; 
+            }
+            .header {
+                margin-top: 45px !important; /* 手機版硬推 45px 防疊字 */
+            }
             #time { font-size: 2.3em; } 
             .bus-panel { max-height: 220px; }
             .news-data-container { max-height: 280px; }
@@ -442,79 +457,92 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (徹底棄用 rss2json，改用純 XML 代理及 Yahoo 香港新聞作後備)
+        // 8. 滾動新聞 API (時間修復：精準鎖定香港時區 UTC+8)
         async function fetchNews() {
             try {
-                // 來源 1: 港台 (RTHK)
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
-                // 來源 2: Yahoo 香港焦點新聞 (更新快，極難被封)
-                const yahooUrl = 'https://hk.news.yahoo.com/rss/hong-kong';
+                const googleUrl = 'https://news.google.com/rss/headlines/section/geo/HK?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
                 
-                const sources = [
-                    { url: rthkUrl, name: '港台即時重點新聞', link: 'https://news.rthk.hk/rthk/ch/' },
-                    { url: yahooUrl, name: 'Yahoo 香港焦點新聞', link: 'https://hk.news.yahoo.com/hong-kong' }
+                const endpoints = [
+                    `https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=true`,
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`,
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(googleUrl)}`
                 ];
 
                 let newsList = [];
-                let currentSource = null;
+                let fetchSuccess = false;
+                let currentSource = 'rthk';
                 
-                for (let source of sources) {
-                    // 加入時間戳迫使 Proxy 讀取最新內容
-                    const targetUrl = source.url + '?_=' + Date.now();
-                    const encodedUrl = encodeURIComponent(targetUrl);
-                    
-                    // 只使用 Raw XML Proxy，保證無第三方 JSON 緩存
-                    const proxies = [
-                        `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`,
-                        `https://corsproxy.io/?${encodedUrl}`,
-                        `https://api.allorigins.win/raw?url=${encodedUrl}`
-                    ];
-
-                    for (let proxy of proxies) {
-                        try {
-                            const res = await fetch(proxy, { cache: "no-store" });
-                            if (!res.ok) continue;
-                            
-                            const xmlText = await res.text();
-                            
-                            if (xmlText && xmlText.includes('<item>')) {
+                for (let endpoint of endpoints) {
+                    try {
+                        if (endpoint.includes(encodeURIComponent(googleUrl))) {
+                            currentSource = 'google';
+                        }
+                        
+                        const res = await fetch(endpoint, { cache: "no-store" });
+                        if (!res.ok) continue;
+                        
+                        if (endpoint.includes('rss2json')) {
+                            const data = await res.json();
+                            if (data.status === 'ok' && data.items && data.items.length > 0) {
+                                for (let item of data.items) {
+                                    // 精準時間解析：將字串轉為合法 Date 物件
+                                    let parseStr = item.pubDate;
+                                    if (typeof parseStr === 'string') parseStr = parseStr.replace(/-/g, '/');
+                                    const pubDate = new Date(parseStr);
+                                    
+                                    newsList.push({
+                                        title: item.title.trim(),
+                                        timestamp: isNaN(pubDate.getTime()) ? 0 : pubDate.getTime(),
+                                        dateObj: pubDate
+                                    });
+                                }
+                                fetchSuccess = true;
+                                break; 
+                            }
+                        } else if (endpoint.includes('allorigins')) {
+                            const data = await res.json();
+                            if (data.contents && data.contents.includes('<item>')) {
                                 const parser = new DOMParser();
-                                const xml = parser.parseFromString(xmlText, "text/xml");
+                                const xml = parser.parseFromString(data.contents, "text/xml");
                                 const items = xml.querySelectorAll("item");
-                                
                                 for (let i = 0; i < items.length; i++) {
                                     const titleNode = items[i].querySelector("title");
                                     const pubDateNode = items[i].querySelector("pubDate");
-                                    
-                                    if (titleNode && pubDateNode) {
-                                        const pubDate = new Date(pubDateNode.textContent.trim());
-                                        if (!isNaN(pubDate.getTime())) {
-                                            newsList.push({
-                                                title: titleNode.textContent.trim(),
-                                                timestamp: pubDate.getTime(),
-                                                timeStr: pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'})
-                                            });
+                                    if (titleNode) {
+                                        let pubDate = new Date(0);
+                                        if (pubDateNode) {
+                                            pubDate = new Date(pubDateNode.textContent.trim());
                                         }
+                                        newsList.push({
+                                            title: titleNode.textContent.trim(),
+                                            timestamp: isNaN(pubDate.getTime()) ? 0 : pubDate.getTime(),
+                                            dateObj: pubDate
+                                        });
                                     }
                                 }
-                                
                                 if (newsList.length > 0) {
-                                    currentSource = source;
-                                    break; // 成功讀取 XML，跳出 Proxy 迴圈
+                                    fetchSuccess = true;
+                                    break; 
                                 }
                             }
-                        } catch (e) {
-                            console.warn("Proxy fallback triggered");
                         }
+                    } catch (e) {
+                        console.warn("Proxy fallback triggered");
                     }
-                    if (newsList.length > 0) break; // 成功讀取資料，跳出 Source 迴圈
                 }
 
-                if (newsList.length > 0) {
-                    // 更新標題及連結
-                    document.getElementById('news-title').innerHTML = `📰 ${currentSource.name}`;
-                    document.getElementById('news-url-btn').href = currentSource.link;
-                    document.getElementById('news-url-btn').innerText = `🔗 點擊查看${currentSource.name.includes('Yahoo') ? ' Yahoo' : '港台'}新聞`;
+                if (fetchSuccess && newsList.length > 0) {
+                    // 動態更改標題與連結
+                    if (currentSource === 'google') {
+                        document.getElementById('news-title').innerHTML = '📰 Google 香港焦點新聞';
+                        document.getElementById('news-url-btn').href = 'https://news.google.com/?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
+                        document.getElementById('news-url-btn').innerText = '🔗 點擊查看 Google News';
+                    } else {
+                        document.getElementById('news-title').innerHTML = '📰 港台即時重點新聞';
+                        document.getElementById('news-url-btn').href = 'https://news.rthk.hk/rthk/ch/';
+                        document.getElementById('news-url-btn').innerText = '🔗 點擊查看港台即時新聞';
+                    }
 
                     // 強制降序排列 (最新時間必定排喺最頂)
                     newsList.sort((a, b) => b.timestamp - a.timestamp);
@@ -522,7 +550,19 @@
                     let html = '';
                     for (let news of newsList) {
                         if(!news.title) continue;
-                        const timeTag = news.timeStr ? `<span class="news-time">[${news.timeStr}]</span> ` : '';
+                        
+                        // 香港時區 (Asia/Hong_Kong) 精準格式化，解決「下午變上午」的問題
+                        let timeStr = '';
+                        if (news.timestamp > 0) {
+                            timeStr = news.dateObj.toLocaleTimeString('zh-HK', {
+                                timeZone: 'Asia/Hong_Kong',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                            });
+                        }
+
+                        const timeTag = timeStr ? `<span class="news-time">[${timeStr}]</span> ` : '';
                         html += `<div class="news-item">${timeTag}${news.title}</div>`;
                     }
                     document.getElementById('news-data').innerHTML = html;
