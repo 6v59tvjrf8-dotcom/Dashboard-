@@ -14,11 +14,9 @@
         #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
         .date-section { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
         
-        /* 日期與更新按鈕同一行 */
         .date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
         #date { font-size: 1.2em; color: #ff6b81; font-weight: bold; line-height: 1; margin: 0; }
         
-        /* 更新按鈕樣式 */
         #refresh-btn { background: #f1f2f6; border: none; color: #555; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1em; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         #refresh-btn:active { background: #dfe4ea; transform: scale(0.9); }
         .spin { animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
@@ -52,7 +50,7 @@
         .right-column { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
         @media (max-width: 768px) { .right-column { overflow: visible; } }
         
-        .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; max-height: 50%; }
         .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; min-width: 120px; }
         .bus-route { background: #0097e6; color: white; padding: 4px 10px; border-radius: 8px; font-weight: bold; font-size: 1.05em; white-space: nowrap; }
@@ -61,10 +59,19 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        .news-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
-        .news-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.5; }
+        /* 滾動新聞區塊專屬樣式 */
+        .news-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 250px; }
+        .news-data-container { flex: 1; overflow-y: auto; margin-bottom: 10px; padding-right: 5px; }
+        /* 美化滾動條 */
+        .news-data-container::-webkit-scrollbar { width: 4px; }
+        .news-data-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .news-data-container::-webkit-scrollbar-thumb { background: #dcdde1; border-radius: 4px; }
+        
+        .news-item { font-size: 0.9em; color: #444; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
         .news-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .news-link-btn { display: block; text-align: center; margin-top: 8px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; }
+        .news-time { color: #888; font-size: 0.85em; margin-right: 5px; font-weight: bold; }
+        
+        .news-link-btn { display: block; text-align: center; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; flex-shrink: 0; }
         .news-link-btn:active { background: #eccc68; color: white; }
 
         .bible-panel { padding: 12px 15px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
@@ -86,7 +93,6 @@
             <div id="time">載入中...</div>
         </div>
         <div class="date-section">
-            <!-- 加入了手動更新按鈕 -->
             <div class="date-row">
                 <div id="date"></div>
                 <button id="refresh-btn" onclick="manualRefresh()" title="立即更新數據">
@@ -122,15 +128,14 @@
 
         <div class="right-column">
             <div class="card bus-panel">
-                <h3 style="margin-top:0; font-size: 1.1em;">🚌 269D 往瀝源</h3>
+                <h3 style="margin-top:0; font-size: 1.1em; flex-shrink: 0;">🚌 269D 往瀝源</h3>
                 <div id="bus-data">載入中...</div>
             </div>
             
             <div class="card news-panel">
-                <div>
-                    <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43;">📰 即時重點新聞</h3>
-                    <div id="news-data">載入中...</div>
-                </div>
+                <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43; flex-shrink: 0;">📰 12小時內重點新聞</h3>
+                <!-- 可獨立上下滑動的新聞顯示區 -->
+                <div id="news-data" class="news-data-container">載入中...</div>
                 <a href="https://news.rthk.hk/rthk/ch/" target="_blank" class="news-link-btn">🔗 點擊查看港台即時新聞</a>
             </div>
         </div>
@@ -173,18 +178,14 @@
             document.getElementById('stop-btn').classList.add('active');
         }
 
-        // 手動更新按鈕功能
         function manualRefresh() {
             const icon = document.getElementById('refresh-icon');
-            // 加入旋轉特效
             icon.classList.add('spin');
             
-            // 觸發所有資料更新
             updateAllWeather();
             fetchBus();
             fetchNews();
             
-            // 1.5秒後移除旋轉特效，模擬載入完成的手感
             setTimeout(() => {
                 icon.classList.remove('spin');
             }, 1500);
@@ -261,7 +262,7 @@
         }
         fetchHoliday();
 
-        // 4. 天文台天氣 API (整合降雨量)
+        // 4. 天文台天氣 API 
         async function fetchWeather() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
@@ -428,7 +429,7 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 新聞資訊 API (多重後備陣列)
+        // 8. 滾動新聞 API (過濾 12 小時內)
         async function fetchNews() {
             try {
                 const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
@@ -440,6 +441,8 @@
                 ];
 
                 let html = '';
+                const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000); // 12小時前的 Timestamp
+                let addedCount = 0;
                 
                 for (let url of urlsToTry) {
                     try {
@@ -449,8 +452,14 @@
                         if (url.includes('rss2json')) {
                             const data = await res.json();
                             if (data.items && data.items.length > 0) {
-                                for (let i = 0; i < Math.min(3, data.items.length); i++) {
-                                    html += `<div class="news-item">📰 ${data.items[i].title.trim()}</div>`;
+                                for (let item of data.items) {
+                                    // 確保 Date 能在 Safari 正確解析
+                                    const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
+                                    if (pubDate.getTime() >= twelveHoursAgo) {
+                                        const timeStr = pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
+                                        html += `<div class="news-item"><span class="news-time">[${timeStr}]</span> ${item.title.trim()}</div>`;
+                                        addedCount++;
+                                    }
                                 }
                                 break; 
                             }
@@ -460,16 +469,19 @@
                                 const parser = new DOMParser();
                                 const xml = parser.parseFromString(text, "text/xml");
                                 const items = xml.querySelectorAll("item");
-                                let count = 0;
                                 for (let i = 0; i < items.length; i++) {
                                     const titleNode = items[i].querySelector("title");
-                                    if (titleNode) {
-                                        html += `<div class="news-item">📰 ${titleNode.textContent.trim()}</div>`;
-                                        count++;
-                                        if (count >= 3) break;
+                                    const pubDateNode = items[i].querySelector("pubDate");
+                                    if (titleNode && pubDateNode) {
+                                        const pubDate = new Date(pubDateNode.textContent.trim());
+                                        if (pubDate.getTime() >= twelveHoursAgo) {
+                                            const timeStr = pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
+                                            html += `<div class="news-item"><span class="news-time">[${timeStr}]</span> ${titleNode.textContent.trim()}</div>`;
+                                            addedCount++;
+                                        }
                                     }
                                 }
-                                if (count > 0) break; 
+                                if (addedCount > 0) break; 
                             }
                         }
                     } catch (e) {}
@@ -477,6 +489,8 @@
 
                 if (html !== '') {
                     document.getElementById('news-data').innerHTML = html;
+                } else if (addedCount === 0) {
+                    document.getElementById('news-data').innerHTML = '<div style="color: #999; font-size: 0.9em; text-align: center; padding: 20px 0;">目前暫無 12 小時內的突發新聞</div>';
                 } else {
                     throw new Error("全部代理失效");
                 }
