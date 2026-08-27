@@ -429,93 +429,81 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (強制解析原始 XML 確保最新)
+        // 8. 滾動新聞 API (完全捨棄 rss2json，只用 XML 直連，強制最新排序)
         async function fetchNews() {
             try {
-                // 加上時間戳，確保不被瀏覽器或 Proxy 緩存
-                const noCacheUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml?v=' + Date.now();
+                // 每次都生成全新時間戳，強迫所有 Proxy 拉取最新檔案
+                const timestamp = Date.now();
+                const targetUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml?v=' + timestamp;
+                const encodedUrl = encodeURIComponent(targetUrl);
                 
-                // 將能夠直接回傳原生 XML 的代理排在最前面
-                const urlsToTry = [
-                    `https://api.allorigins.win/raw?url=${encodeURIComponent(noCacheUrl)}`,
-                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(noCacheUrl)}`,
-                    // rss2json 快取太嚴重，放到最後備用
-                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml')}`
+                const proxies = [
+                    `https://api.allorigins.win/get?url=${encodedUrl}&disableCache=${timestamp}`,
+                    `https://corsproxy.io/?${encodedUrl}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`
                 ];
 
-                let newsList = [];
-                let fetchSuccess = false;
+                let xmlText = '';
                 
-                for (let url of urlsToTry) {
+                for (let proxy of proxies) {
                     try {
-                        const res = await fetch(url, { cache: "no-store" });
+                        const res = await fetch(proxy, { cache: "no-store" });
                         if (!res.ok) continue;
                         
-                        if (url.includes('rss2json')) {
+                        // 如果用 AllOrigins GET 模式，佢會包裝喺 JSON 入面
+                        if (proxy.includes('allorigins.win/get')) {
                             const data = await res.json();
-                            if (data.items && data.items.length > 0) {
-                                for (let item of data.items) {
-                                    const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
-                                    newsList.push({
-                                        title: item.title.trim(),
-                                        date: pubDate,
-                                        timeStr: isNaN(pubDate.getTime()) ? '' : pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'})
-                                    });
-                                }
-                                fetchSuccess = true;
-                                break; 
+                            if (data.contents && data.contents.includes('<item>')) {
+                                xmlText = data.contents;
+                                break;
                             }
                         } else {
-                            // 收到原生 XML
+                            // 其他 Proxy 直接回傳 XML 文字
                             const text = await res.text();
                             if (text.includes('<item>')) {
-                                const parser = new DOMParser();
-                                const xml = parser.parseFromString(text, "text/xml");
-                                const items = xml.querySelectorAll("item");
-                                for (let i = 0; i < items.length; i++) {
-                                    const titleNode = items[i].querySelector("title");
-                                    const pubDateNode = items[i].querySelector("pubDate");
-                                    if (titleNode) {
-                                        let pubDate = new Date(0);
-                                        let timeStr = '';
-                                        if (pubDateNode) {
-                                            pubDate = new Date(pubDateNode.textContent.trim());
-                                            if (!isNaN(pubDate.getTime())) {
-                                                timeStr = pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'});
-                                            }
-                                        }
-                                        newsList.push({
-                                            title: titleNode.textContent.trim(),
-                                            date: pubDate,
-                                            timeStr: timeStr
-                                        });
-                                    }
-                                }
-                                if (newsList.length > 0) {
-                                    fetchSuccess = true;
-                                    break; 
-                                }
+                                xmlText = text;
+                                break;
                             }
                         }
                     } catch (e) {}
                 }
 
-                if (fetchSuccess && newsList.length > 0) {
-                    // 強制降序排列 (時間最新的排第一)
-                    newsList.sort((a, b) => {
-                        const timeA = isNaN(a.date.getTime()) ? 0 : a.date.getTime();
-                        const timeB = isNaN(b.date.getTime()) ? 0 : b.date.getTime();
-                        return timeB - timeA;
-                    });
+                if (!xmlText) {
+                    throw new Error("全部即時代理失效");
+                }
+
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlText, "text/xml");
+                const items = xml.querySelectorAll("item");
+                let newsList = [];
+
+                for (let i = 0; i < items.length; i++) {
+                    const titleNode = items[i].querySelector("title");
+                    const pubDateNode = items[i].querySelector("pubDate");
+                    
+                    if (titleNode && pubDateNode) {
+                        const pubDate = new Date(pubDateNode.textContent.trim());
+                        if (!isNaN(pubDate.getTime())) {
+                            newsList.push({
+                                title: titleNode.textContent.trim(),
+                                timestamp: pubDate.getTime(),
+                                timeStr: pubDate.toLocaleTimeString('zh-HK', {hour: '2-digit', minute:'2-digit'})
+                            });
+                        }
+                    }
+                }
+
+                if (newsList.length > 0) {
+                    // 核心：強制進行降序排列（數值最大 / 時間最新，必定排喺最頂）
+                    newsList.sort((a, b) => b.timestamp - a.timestamp);
 
                     let html = '';
                     for (let news of newsList) {
-                        const timeTag = news.timeStr ? `<span class="news-time">[${news.timeStr}]</span> ` : '';
-                        html += `<div class="news-item">${timeTag}${news.title}</div>`;
+                        html += `<div class="news-item"><span class="news-time">[${news.timeStr}]</span> ${news.title}</div>`;
                     }
                     document.getElementById('news-data').innerHTML = html;
                 } else {
-                    throw new Error("全部代理失效");
+                    throw new Error("無新聞項目");
                 }
 
             } catch (e) {
