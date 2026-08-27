@@ -9,7 +9,6 @@
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* 頂部區域 */
         .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
         .time-section { color: #007aff; }
         #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
@@ -18,7 +17,6 @@
         .date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
         #date { font-size: 1.2em; color: #ff6b81; font-weight: bold; line-height: 1; margin: 0; }
         
-        /* Refresh 按鈕 */
         #refresh-btn { background: #f1f2f6; border: none; color: #555; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1em; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         #refresh-btn:active { background: #dfe4ea; transform: scale(0.9); }
         .spin { animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
@@ -32,20 +30,16 @@
             .content { flex-direction: column; overflow-y: auto; }
             body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
             #time { font-size: 2.3em; } 
-            
-            /* 手機版排版優化：限制高度以顯示滾動條 */
             .bus-panel { max-height: 220px; }
             .news-data-container { max-height: 280px; }
         }
         
-        /* 天氣區域 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
         .temp { font-size: 3.5em; font-weight: bold; color: #ff9f43; margin: 5px 0; line-height: 1; }
         #weather-warnings { min-height: 25px; margin-bottom: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
         .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.85em; font-weight: bold; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
         .badge-safe { background-color: #f1f2f6; color: #576574; box-shadow: none; border: 1px solid #ced6e0; }
         
-        /* 四宮格 */
         .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; text-align: center; }
         .weather-item { background: #f8f9fa; padding: 10px 4px; border-radius: 12px; font-size: 0.8em; color: #555; display: flex; flex-direction: column; justify-content: center; gap: 4px; border: 1px solid #eee; }
         .weather-item b { font-size: 1.15em; color: #2f3542; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -58,7 +52,6 @@
         .right-column { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
         @media (max-width: 768px) { .right-column { overflow: visible; } }
         
-        /* 巴士區域 */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
         .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; min-width: 120px; }
@@ -68,7 +61,6 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        /* 滾動新聞區域 */
         .news-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 250px; }
         .news-data-container { flex: 1; overflow-y: auto; margin-bottom: 10px; padding-right: 5px; }
         .news-data-container::-webkit-scrollbar { width: 4px; }
@@ -82,7 +74,6 @@
         .news-link-btn { display: block; text-align: center; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; flex-shrink: 0; }
         .news-link-btn:active { background: #eccc68; color: white; }
 
-        /* 底部模塊 */
         .bible-panel { padding: 12px 15px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
         .audio-panel { padding-top: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -12px; }
@@ -192,6 +183,7 @@
             
             updateAllWeather();
             fetchBus();
+            document.getElementById('news-data').innerHTML = '更新中...';
             fetchNews();
             
             setTimeout(() => {
@@ -215,7 +207,7 @@
                 "「應當一無掛慮，只要凡事藉著禱告、祈求，和感謝，將你們所要的告訴神。」(腓立比書 4:6)",
                 "「我的恩典夠你用的，因為我的能力是在人的軟弱上顯得完全。」(哥林多後書 12:9)",
                 "「你要專心仰賴耶和華，不可倚靠自己的聰明。」(箴言 3:5)",
-                "「凡勞苦擔重擔的人可以到我這裏來，我就使வனை得安息。」(馬太福音 11:28)",
+                "「凡勞苦擔重擔的人可以到我這裏來，我就使你們得安息。」(馬太福音 11:28)",
                 "「神愛世人，甚至將他的獨生子賜給他們，叫一切信他的，不致滅亡，反得永生。」(約翰福音 3:16)",
                 "「我們曉得萬事都互相效力，叫愛神的人得益處。」(羅馬書 8:28)",
                 "「喜樂的心乃是良藥；憂傷的靈使骨枯乾。」(箴言 17:22)",
@@ -437,16 +429,18 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (加入強制時間排序 + 破解 Proxy 緩存機制)
+        // 8. 滾動新聞 API (強制解析原始 XML 確保最新)
         async function fetchNews() {
             try {
-                // 加上時間戳強迫所有 Proxy 拉取最新鮮資料，避免 Cache
-                const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml?_=' + Date.now();
+                // 加上時間戳，確保不被瀏覽器或 Proxy 緩存
+                const noCacheUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml?v=' + Date.now();
                 
+                // 將能夠直接回傳原生 XML 的代理排在最前面
                 const urlsToTry = [
-                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
-                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
-                    `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(noCacheUrl)}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(noCacheUrl)}`,
+                    // rss2json 快取太嚴重，放到最後備用
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml')}`
                 ];
 
                 let newsList = [];
@@ -472,6 +466,7 @@
                                 break; 
                             }
                         } else {
+                            // 收到原生 XML
                             const text = await res.text();
                             if (text.includes('<item>')) {
                                 const parser = new DOMParser();
@@ -506,7 +501,7 @@
                 }
 
                 if (fetchSuccess && newsList.length > 0) {
-                    // 核心：強制進行降序排列（時間越大/越新 必定排喺最頂）
+                    // 強制降序排列 (時間最新的排第一)
                     newsList.sort((a, b) => {
                         const timeA = isNaN(a.date.getTime()) ? 0 : a.date.getTime();
                         const timeB = isNaN(b.date.getTime()) ? 0 : b.date.getTime();
