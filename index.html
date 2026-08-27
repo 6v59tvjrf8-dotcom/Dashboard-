@@ -6,11 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>實時 Dashboard</title>
     <style>
+        /* 基礎排版 */
         body { 
             font-family: -apple-system, sans-serif; 
             background-color: #fff8f0; 
             margin: 0; 
-            padding: 15px; 
+            /* 預設加入安全邊距 */
+            padding: max(20px, env(safe-area-inset-top)) 15px max(15px, env(safe-area-inset-bottom)) 15px; 
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
@@ -37,11 +39,17 @@
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
         
-        /* 手機版排版優化：加入 padding-top: 45px 強制避開 iPhone 狀態欄防疊字 */
+        /* 手機版排版優化：硬推 padding-top: 55px 徹底防疊字 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
-            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; padding-top: 45px; }
-            #time { font-size: 2.3em; } 
+            body { 
+                height: auto; 
+                min-height: 100vh; 
+                overflow: auto; 
+                padding-bottom: 40px !important; 
+                padding-top: 55px !important; /* 強制推低，避開狀態欄 */
+            }
+            #time { font-size: 2.4em; } 
             .bus-panel { max-height: 220px; }
             .news-data-container { max-height: 280px; }
         }
@@ -145,9 +153,10 @@
             </div>
             
             <div class="card news-panel">
-                <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43; flex-shrink: 0;">📰 即時重點新聞</h3>
+                <!-- 標題會根據來源自動變更 -->
+                <h3 id="news-title" style="margin-top:0; font-size: 1.05em; color: #ff9f43; flex-shrink: 0;">📰 即時重點新聞</h3>
                 <div id="news-data" class="news-data-container">載入中...</div>
-                <a href="https://news.rthk.hk/rthk/ch/" target="_blank" class="news-link-btn">🔗 點擊查看港台即時新聞</a>
+                <a id="news-url-btn" href="https://news.rthk.hk/rthk/ch/" target="_blank" class="news-link-btn">🔗 點擊查看即時新聞</a>
             </div>
         </div>
     </div>
@@ -441,29 +450,36 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (防 404 乾淨 URL + 依賴 Proxy 破快取 + 強制降序)
+        // 8. 滾動新聞 API (終極雙源智能切換系統：港台首選 ➡️ Google News HK 後備)
         async function fetchNews() {
             try {
-                // 絕對純淨嘅港台 URL (唔加任何參數，防 404)
-                const rssUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
-                const encodedUrl = encodeURIComponent(rssUrl);
+                // 來源 1: 港台 (RTHK)
+                const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
+                // 來源 2: Google News 香港 (極難被封鎖的終極後備)
+                const googleUrl = 'https://news.google.com/rss/headlines/section/geo/HK?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
                 
-                // 破快取指令交俾 Proxy 處理
-                const proxies = [
-                    `https://api.allorigins.win/get?url=${encodedUrl}&disableCache=true`,
-                    `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}&t=${Date.now()}`,
-                    `https://api.rss2json.com/v1/api.json?rss_url=${encodedUrl}`
+                // 代理清單 (優先使用 AllOrigins 包裝，其次用 rss2json 作為防線)
+                const endpoints = [
+                    `https://api.allorigins.win/get?url=${encodeURIComponent(rthkUrl)}&disableCache=true`,
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkUrl)}`,
+                    // 如果港台全面陣亡，自動切換至 Google News 香港焦點
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(googleUrl)}`
                 ];
 
                 let newsList = [];
                 let fetchSuccess = false;
+                let currentSource = 'rthk'; // 追蹤新聞來源
                 
-                for (let proxy of proxies) {
+                for (let endpoint of endpoints) {
                     try {
-                        const res = await fetch(proxy, { cache: "no-store" });
+                        if (endpoint.includes(encodeURIComponent(googleUrl))) {
+                            currentSource = 'google';
+                        }
+                        
+                        const res = await fetch(endpoint, { cache: "no-store" });
                         if (!res.ok) continue;
                         
-                        if (proxy.includes('rss2json')) {
+                        if (endpoint.includes('rss2json')) {
                             const data = await res.json();
                             if (data.status === 'ok' && data.items && data.items.length > 0) {
                                 for (let item of data.items) {
@@ -477,18 +493,11 @@
                                 fetchSuccess = true;
                                 break; 
                             }
-                        } else {
-                            let xmlText = '';
-                            if (proxy.includes('allorigins')) {
-                                const data = await res.json();
-                                xmlText = data.contents;
-                            } else {
-                                xmlText = await res.text();
-                            }
-
-                            if (xmlText && xmlText.includes('<item>')) {
+                        } else if (endpoint.includes('allorigins')) {
+                            const data = await res.json();
+                            if (data.contents && data.contents.includes('<item>')) {
                                 const parser = new DOMParser();
-                                const xml = parser.parseFromString(xmlText, "text/xml");
+                                const xml = parser.parseFromString(data.contents, "text/xml");
                                 const items = xml.querySelectorAll("item");
                                 for (let i = 0; i < items.length; i++) {
                                     const titleNode = items[i].querySelector("title");
@@ -521,6 +530,17 @@
                 }
 
                 if (fetchSuccess && newsList.length > 0) {
+                    // 動態更改標題與連結
+                    if (currentSource === 'google') {
+                        document.getElementById('news-title').innerHTML = '📰 Google 香港焦點新聞';
+                        document.getElementById('news-url-btn').href = 'https://news.google.com/?hl=zh-HK&gl=HK&ceid=HK:zh-Hant';
+                        document.getElementById('news-url-btn').innerText = '🔗 點擊查看 Google News';
+                    } else {
+                        document.getElementById('news-title').innerHTML = '📰 港台即時重點新聞';
+                        document.getElementById('news-url-btn').href = 'https://news.rthk.hk/rthk/ch/';
+                        document.getElementById('news-url-btn').innerText = '🔗 點擊查看港台即時新聞';
+                    }
+
                     // 強制降序排列 (最新時間必定排喺最頂)
                     newsList.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -532,7 +552,7 @@
                     }
                     document.getElementById('news-data').innerHTML = html;
                 } else {
-                    throw new Error("全部代理失效或無法解析");
+                    throw new Error("所有新聞來源及代理均失效");
                 }
 
             } catch (e) {
