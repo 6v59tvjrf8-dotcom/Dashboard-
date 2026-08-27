@@ -9,7 +9,7 @@
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* 頂部時間及日期樣式 (全新左右分區設計) */
+        /* 頂部時間及日期樣式 (左右分區設計) */
         .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
         .time-section { color: #007aff; }
         #time { font-size: 2.8em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
@@ -21,7 +21,7 @@
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
             body { height: auto; min-height: 100vh; overflow: auto; }
-            #time { font-size: 2.4em; } /* 手機版稍為縮細時間字體防止逼爆 */
+            #time { font-size: 2.4em; } 
         }
         
         /* 天氣樣式 */
@@ -257,19 +257,69 @@
             } catch (e) {}
         }
 
-        // 6. 天文台警告 API
+        // 6. 天文台警告 API (已整合：常規天氣警告 + 實時工作暑熱警告)
         async function fetchWarnings() {
             try {
-                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc');
-                const data = await res.json();
-                const warningContainer = document.getElementById('weather-warnings');
-                if (Object.keys(data).length === 0) { warningContainer.innerHTML = ''; return; }
                 let warningHtml = '';
-                for (const key in data) {
-                    if (data[key].name) { warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`; }
+                const warningContainer = document.getElementById('weather-warnings');
+
+                // A. 讀取天文台常規天氣警告 (如雷暴、酷熱等)
+                try {
+                    const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc');
+                    if (res.ok) {
+                        const data = await res.json();
+                        for (const key in data) {
+                            if (data[key].name) { 
+                                warningHtml += `<span class="warning-badge">⚠️ ${data[key].name}</span>`; 
+                            }
+                        }
+                    }
+                } catch (e) {}
+
+                // B. 讀取勞工處實時工作暑熱警告 API (智能字眼匹配，防死機設計)
+                try {
+                    const hswwRes = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/hsww.php?lang=tc');
+                    if (hswwRes.ok) {
+                        const hswwText = await hswwRes.text();
+                        
+                        // 確保有資料傳回，並且不是空物件
+                        if (hswwText && hswwText.trim() !== '{}' && hswwText.trim() !== '') {
+                            const strData = hswwText.toUpperCase(); 
+                            
+                            // 防呆機制：預防 API 包含「取消」或「CANCEL」之歷史記錄
+                            if (!strData.includes("CANCEL") && !strData.includes("取消")) {
+                                let hswwLevel = '';
+                                let badgeColor = '';
+
+                                if (strData.includes("黑") || strData.includes("BLACK")) {
+                                    hswwLevel = "黑色工作暑熱警告";
+                                    badgeColor = "#2f3542"; // 型格深黑色
+                                } else if (strData.includes("紅") || strData.includes("RED")) {
+                                    hswwLevel = "紅色工作暑熱警告";
+                                    badgeColor = "#ff4757"; // 警告紅色
+                                } else if (strData.includes("黃") || strData.includes("AMBER") || strData.includes("YELLOW")) {
+                                    hswwLevel = "黃色工作暑熱警告";
+                                    badgeColor = "#f39c12"; // 較深黃色，確保白色字體對比度
+                                } else if (strData.includes("暑熱") || strData.includes("HEAT")) {
+                                    hswwLevel = "工作暑熱警告生效";
+                                    badgeColor = "#e67e22"; // 預防格式變更的橙色後備
+                                }
+
+                                // 智能防重覆機制：如果天文台常規警告將來合併咗「暑熱」字眼，就唔好重覆顯示
+                                if (hswwLevel && !warningHtml.includes("暑熱")) {
+                                    warningHtml += `<span class="warning-badge" style="background-color: ${badgeColor}; box-shadow: 0 2px 5px ${badgeColor}80;">🥵 ${hswwLevel}</span>`;
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("暑熱警告讀取失敗", e);
                 }
+
                 warningContainer.innerHTML = warningHtml;
-            } catch (e) {}
+            } catch (e) { 
+                console.error('整體警告載入失敗'); 
+            }
         }
 
         fetchWeather(); fetchForecast(); fetchWarnings();
@@ -337,7 +387,7 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 交通消息 API 
+        // 8. 交通消息 API (最穩定寫法 + 一鍵直達按鈕)
         async function fetchTraffic() {
             try {
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
