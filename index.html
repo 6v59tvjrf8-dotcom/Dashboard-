@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <!-- 加入 viewport-fit=cover 確保支援 iPhone 安全區域 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>實時 Dashboard</title>
     <style>
-        /* 加入 env(safe-area-inset-top) 避開 iPhone 頂部系統時間及動態島 */
         body { 
             font-family: -apple-system, sans-serif; 
             background-color: #fff8f0; 
             margin: 0; 
-            padding: max(15px, env(safe-area-inset-top)) 15px max(15px, env(safe-area-inset-bottom)) 15px; 
+            padding: 15px; 
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
@@ -39,9 +37,10 @@
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
         
+        /* 手機版排版優化：加入 padding-top: 45px 強制避開 iPhone 狀態欄防疊字 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
-            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
+            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; padding-top: 45px; }
             #time { font-size: 2.3em; } 
             .bus-panel { max-height: 220px; }
             .news-data-container { max-height: 280px; }
@@ -442,20 +441,17 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (還原乾淨 URL 防 404，完全依賴 Proxy 內建防快取指令，並確保最新排序)
+        // 8. 滾動新聞 API (防 404 乾淨 URL + 依賴 Proxy 破快取 + 強制降序)
         async function fetchNews() {
             try {
-                // 1. 原版乾淨 URL，確保港台伺服器唔會當係惡意連結而回傳 404
-                const targetUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
-                const encodedUrl = encodeURIComponent(targetUrl);
+                // 絕對純淨嘅港台 URL (唔加任何參數，防 404)
+                const rssUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
+                const encodedUrl = encodeURIComponent(rssUrl);
                 
-                // 2. 將破快取 (Cache Busting) 任務交俾代理伺服器
+                // 破快取指令交俾 Proxy 處理
                 const proxies = [
-                    // 首選：AllOrigins (加入 disableCache=true 參數，並回傳安全的 JSON Wrapper)
                     `https://api.allorigins.win/get?url=${encodedUrl}&disableCache=true`,
-                    // 備用 1：CodeTabs (直接穿透，回傳 Raw XML)
-                    `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}`,
-                    // 備用 2：rss2json (有快取延遲問題，最後防線)
+                    `https://api.codetabs.com/v1/proxy?quest=${encodedUrl}&t=${Date.now()}`,
                     `https://api.rss2json.com/v1/api.json?rss_url=${encodedUrl}`
                 ];
 
@@ -469,7 +465,7 @@
                         
                         if (proxy.includes('rss2json')) {
                             const data = await res.json();
-                            if (data.items && data.items.length > 0) {
+                            if (data.status === 'ok' && data.items && data.items.length > 0) {
                                 for (let item of data.items) {
                                     const pubDate = new Date(item.pubDate.replace(/-/g, '/'));
                                     newsList.push({
@@ -520,7 +516,7 @@
                             }
                         }
                     } catch (e) {
-                        console.warn("Proxy failed:", proxy);
+                        console.warn("Proxy fallback triggered");
                     }
                 }
 
