@@ -447,7 +447,7 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 滾動新聞 API (香港時區修復：對 GMT 時間精確校正 +8 小時)
+        // 8. 滾動新聞 API
         async function fetchNews() {
             try {
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_clocal.xml';
@@ -477,7 +477,6 @@
                             if (data.status === 'ok' && data.items && data.items.length > 0) {
                                 for (let item of data.items) {
                                     let pubDate = new Date(item.pubDate.replace(/-/g, '/'));
-                                    // 校正：如果係 Google/Yahoo GMT 時間，修正 8 小時時差
                                     if (currentSource !== 'rthk') {
                                         pubDate = new Date(pubDate.getTime() + (8 * 60 * 60 * 1000));
                                     }
