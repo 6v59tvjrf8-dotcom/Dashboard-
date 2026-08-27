@@ -6,71 +6,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>實時 Dashboard</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 15px; height: 100vh; box-sizing: border-box; overflow: hidden; }
-        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        /* 縮減了整體 padding 和 gap，令畫面更緊湊 */
+        body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100vh; box-sizing: border-box; overflow: hidden; }
+        .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* 頂部時間及日期樣式 (左右分區設計) */
         .header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; }
         .time-section { color: #007aff; }
-        #time { font-size: 2.8em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
+        #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
         .date-section { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
-        #date { font-size: 1.3em; color: #ff6b81; font-weight: bold; margin-bottom: 6px; line-height: 1; }
-        #holiday-countdown { font-size: 0.85em; color: #ff9f43; font-weight: bold; background: #fff3e0; padding: 5px 10px; border-radius: 8px; border: 1px solid #ffeaa7; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #date { font-size: 1.2em; color: #ff6b81; font-weight: bold; margin-bottom: 5px; line-height: 1; }
+        #holiday-countdown { font-size: 0.8em; color: #ff9f43; font-weight: bold; background: #fff3e0; padding: 4px 8px; border-radius: 8px; border: 1px solid #ffeaa7; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        .content { display: flex; gap: 15px; flex: 1; min-height: 0; }
+        .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
+        
+        /* 手機版優化：加入 padding-bottom 確保滑到最底唔會被遮住 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
-            body { height: auto; min-height: 100vh; overflow: auto; }
-            #time { font-size: 2.4em; } 
+            body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
+            #time { font-size: 2.3em; } 
         }
         
-        /* 天氣樣式 */
         .weather-panel { flex: 1; display: block; overflow-y: auto; }
-        .temp { font-size: 4em; font-weight: bold; color: #ff9f43; margin: 5px 0; line-height: 1; }
+        .temp { font-size: 3.5em; font-weight: bold; color: #ff9f43; margin: 5px 0; line-height: 1; }
         #weather-warnings { min-height: 25px; margin-bottom: 5px; display: flex; flex-wrap: wrap; gap: 5px; }
-        .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.9em; font-weight: bold; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
+        .warning-badge { display: inline-block; background-color: #ff4757; color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.85em; font-weight: bold; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
         .badge-safe { background-color: #f1f2f6; color: #576574; box-shadow: none; border: 1px solid #ced6e0; }
         
-        /* 四宮格天氣數據面板 */
-        .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0; text-align: center; }
-        .weather-item { background: #f8f9fa; padding: 12px 5px; border-radius: 12px; font-size: 0.85em; color: #555; display: flex; flex-direction: column; gap: 5px; border: 1px solid #eee; }
-        .weather-item b { font-size: 1.25em; color: #2f3542; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; text-align: center; }
+        .weather-item { background: #f8f9fa; padding: 10px 4px; border-radius: 12px; font-size: 0.8em; color: #555; display: flex; flex-direction: column; gap: 4px; border: 1px solid #eee; }
+        .weather-item b { font-size: 1.15em; color: #2f3542; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         @media (max-width: 768px) { .weather-grid { grid-template-columns: repeat(2, 1fr); } }
 
-        .forecast-container { margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
-        .forecast-container h4 { margin: 0 0 8px 0; color: #333; font-size: 1em; }
-        #forecast-desc { font-size: 0.95em; color: #555; line-height: 1.5; }
+        .forecast-container { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
+        .forecast-container h4 { margin: 0 0 6px 0; color: #333; font-size: 0.95em; }
+        #forecast-desc { font-size: 0.9em; color: #555; line-height: 1.4; }
         
-        /* 右側欄：包含巴士與交通 */
-        .right-column { flex: 1; display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
-        @media (max-width: 768px) {
-            .right-column { overflow: visible; }
-        }
+        .right-column { flex: 1; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+        @media (max-width: 768px) { .right-column { overflow: visible; } }
         
-        /* 巴士樣式 */
         .bus-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 12px;}
-        .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex: 1; min-width: 120px; }
-        .bus-route { background: #0097e6; color: white; padding: 5px 12px; border-radius: 8px; font-weight: bold; font-size: 1.1em; white-space: nowrap; }
-        .bus-station { font-size: 1.1em; font-weight: 500; white-space: nowrap; color: #333; }
+        .bus-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        .bus-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; min-width: 120px; }
+        .bus-route { background: #0097e6; color: white; padding: 4px 10px; border-radius: 8px; font-weight: bold; font-size: 1.05em; white-space: nowrap; }
+        .bus-station { font-size: 1.05em; font-weight: 500; white-space: nowrap; color: #333; }
         .bus-time { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
-        .eta { color: #2ed573; font-weight: bold; font-size: 1.3em; }
-        .eta-exact { font-size: 0.85em; color: #888; margin-top: 2px; }
+        .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
+        .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        /* 交通消息樣式 (回歸摘要 + 直達按鈕) */
-        .traffic-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; max-height: 35%; }
-        .traffic-item { font-size: 0.95em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.4; }
+        /* 取消了 min-height，讓它自然縮放 */
+        .traffic-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
+        .traffic-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 6px; line-height: 1.4; }
         .traffic-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .traffic-link-btn { display: block; text-align: center; margin-top: 10px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.95em; transition: all 0.2s; }
+        .traffic-link-btn { display: block; text-align: center; margin-top: 8px; padding: 10px; background: #f1f2f6; border-radius: 10px; text-decoration: none; color: #007aff; font-weight: bold; font-size: 0.9em; transition: all 0.2s; }
         .traffic-link-btn:active { background: #eccc68; color: white; }
 
-        /* 聖經金句區塊 */
-        .bible-panel { padding: 15px 20px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
+        .bible-panel { padding: 12px 15px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
-        /* 音樂按鈕樣式 */
-        .audio-panel { padding-top: 15px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -15px; }
-        .radio-controls { display: flex; flex-wrap: wrap; gap: 10px; padding-bottom: 5px; justify-content: center; }
-        .radio-btn { flex: 1; min-width: 90px; padding: 10px 12px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.95em; transition: all 0.2s; font-weight: bold; text-align: center; }
+        .audio-panel { padding-top: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -12px; }
+        .radio-controls { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 5px; justify-content: center; }
+        .radio-btn { flex: 1; min-width: 80px; padding: 8px 10px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.9em; transition: all 0.2s; font-weight: bold; text-align: center; }
         .radio-btn:active { transform: scale(0.95); }
         .radio-btn.active { background: #ff6b81; color: white; box-shadow: 0 2px 5px rgba(255,107,129,0.4); }
         .btn-stop { background: #dcdde1; color: #333; }
@@ -92,7 +86,7 @@
 
     <div class="content">
         <div class="card weather-panel">
-            <h3 style="margin-top:0;">☀️ 元朗區實時天氣</h3>
+            <h3 style="margin-top:0; font-size: 1.1em;">☀️ 元朗區實時天氣</h3>
             
             <div id="weather-warnings">
                 <span class="warning-badge badge-safe">✅ 沒有工作暑熱警告</span>
@@ -100,12 +94,11 @@
             
             <div class="temp"><span id="temperature">--</span>°C</div>
             
-            <!-- 四宮格氣象數據 -->
             <div class="weather-grid">
                 <div class="weather-item">💧 相對濕度<br><b id="humidity">--</b></div>
                 <div class="weather-item">☀️ 紫外線<br><b id="uv-index">--</b></div>
                 <div class="weather-item">🌬️ 風速<br><b id="wind-speed">--</b></div>
-                <div class="weather-item">⚡ 雲對地閃電<br><b id="lightning-info" style="font-size: 1.1em;">--</b></div>
+                <div class="weather-item">⚡ 雲對地閃電<br><b id="lightning-info" style="font-size: 1.05em;">--</b></div>
             </div>
             
             <div class="forecast-container">
@@ -116,14 +109,13 @@
 
         <div class="right-column">
             <div class="card bus-panel">
-                <h3 style="margin-top:0;">🚌 269D 往瀝源</h3>
+                <h3 style="margin-top:0; font-size: 1.1em;">🚌 269D 往瀝源</h3>
                 <div id="bus-data">載入中...</div>
             </div>
             
-            <!-- 恢復摘要 + 直達按鈕 -->
             <div class="card traffic-panel">
                 <div>
-                    <h3 style="margin-top:0; font-size: 1.1em; color: #ff9f43;">📻 港台交通摘要</h3>
+                    <h3 style="margin-top:0; font-size: 1.05em; color: #ff9f43;">📻 港台交通摘要</h3>
                     <div id="traffic-data">載入中...</div>
                 </div>
                 <a href="https://programme.rthk.hk/channel/radio/trafficnews/index.php" target="_blank" class="traffic-link-btn">🔗 點擊查看完整港台交通網頁</a>
@@ -132,8 +124,8 @@
     </div>
 
     <div class="card bible-panel">
-        <h3 style="margin-top:0; font-size: 1.05em; color: #6c5ce7; margin-bottom: 8px;">📖 每日金句</h3>
-        <div id="bible-verse" style="font-size: 1.05em; color: #444; line-height: 1.5; font-weight: 500;">載入中...</div>
+        <h3 style="margin-top:0; font-size: 1em; color: #6c5ce7; margin-bottom: 6px;">📖 每日金句</h3>
+        <div id="bible-verse" style="font-size: 0.95em; color: #444; line-height: 1.4; font-weight: 500;">載入中...</div>
     </div>
     
     <div class="card audio-panel">
@@ -172,7 +164,7 @@
         function updateClock() {
             const now = new Date();
             document.getElementById('time').innerText = now.toLocaleTimeString('zh-HK', { hour12: false });
-            document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'short' });
+            document.getElementById('date').innerText = now.toLocaleDateString('zh-HK', { month: 'short', day: 'numeric', weekday: 'short' });
         }
         setInterval(updateClock, 1000);
         updateClock();
@@ -210,26 +202,14 @@
         }
         updateBibleVerse();
 
-        // 3. 政府假期
-        async function fetchHoliday() {
-            try {
-                const url = 'https://www.1823.gov.hk/common/ical/tc.json';
-                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-                if (!res.ok) throw new Error("Proxy Failed");
-                const data = await res.json();
-                const events = data.vcalendar[0].vevent;
-                calculateNextHoliday(events);
-            } catch (e) {
-                const fallbackEvents = [
-                    { dtstart: ["20240918"], summary: "中秋節翌日" }, { dtstart: ["20241001"], summary: "國慶日" }, { dtstart: ["20241011"], summary: "重陽節" }, { dtstart: ["20241225"], summary: "聖誕節" }, { dtstart: ["20241226"], summary: "聖誕節後第一個周日" },
-                    { dtstart: ["20250101"], summary: "元旦" }, { dtstart: ["20250129"], summary: "農曆年初一" }, { dtstart: ["20250418"], summary: "耶穌受難節" }, { dtstart: ["20250421"], summary: "復活節" }, { dtstart: ["20250501"], summary: "勞動節" }, { dtstart: ["20250505"], summary: "佛誕" }, { dtstart: ["20250531"], summary: "端午節" }, { dtstart: ["20250701"], summary: "特區成立紀念日" }, { dtstart: ["20251001"], summary: "國慶日" }, { dtstart: ["20251007"], summary: "中秋節翌日" }, { dtstart: ["20251029"], summary: "重陽節" }, { dtstart: ["20251225"], summary: "聖誕節" }, { dtstart: ["20251226"], summary: "聖誕節後第一個周日" },
-                    { dtstart: ["20260101"], summary: "元旦" }, { dtstart: ["20260217"], summary: "農曆年初一" }, { dtstart: ["20260403"], summary: "耶穌受難節" }, { dtstart: ["20260406"], summary: "復活節" }, { dtstart: ["20260501"], summary: "勞動節" }, { dtstart: ["20260524"], summary: "佛誕" }, { dtstart: ["20260619"], summary: "端午節" }, { dtstart: ["20260701"], summary: "特區成立紀念日" }, { dtstart: ["20260926"], summary: "中秋節翌日" }, { dtstart: ["20261001"], summary: "國慶日" }, { dtstart: ["20261019"], summary: "重陽節" }, { dtstart: ["20261225"], summary: "聖誕節" }, { dtstart: ["20261226"], summary: "聖誕節後第一個周日" }
-                ];
-                calculateNextHoliday(fallbackEvents);
-            }
-        }
+        // 3. 假期計算 (離線硬編碼，0秒載入)
+        function fetchHoliday() {
+            const events = [
+                { dtstart: ["20240918"], summary: "中秋節翌日" }, { dtstart: ["20241001"], summary: "國慶日" }, { dtstart: ["20241011"], summary: "重陽節" }, { dtstart: ["20241225"], summary: "聖誕節" }, { dtstart: ["20241226"], summary: "聖誕節後第一個周日" },
+                { dtstart: ["20250101"], summary: "元旦" }, { dtstart: ["20250129"], summary: "農曆年初一" }, { dtstart: ["20250130"], summary: "農曆年初二" }, { dtstart: ["20250131"], summary: "農曆年初三" }, { dtstart: ["20250404"], summary: "清明節" }, { dtstart: ["20250418"], summary: "耶穌受難節" }, { dtstart: ["20250419"], summary: "耶穌受難節翌日" }, { dtstart: ["20250421"], summary: "復活節" }, { dtstart: ["20250501"], summary: "勞動節" }, { dtstart: ["20250505"], summary: "佛誕" }, { dtstart: ["20250531"], summary: "端午節" }, { dtstart: ["20250701"], summary: "特區成立紀念日" }, { dtstart: ["20251001"], summary: "國慶日" }, { dtstart: ["20251007"], summary: "中秋節翌日" }, { dtstart: ["20251029"], summary: "重陽節" }, { dtstart: ["20251225"], summary: "聖誕節" }, { dtstart: ["20251226"], summary: "聖誕節後第一個周日" },
+                { dtstart: ["20260101"], summary: "元旦" }, { dtstart: ["20260217"], summary: "農曆年初一" }, { dtstart: ["20260218"], summary: "農曆年初二" }, { dtstart: ["20260219"], summary: "農曆年初三" }, { dtstart: ["20260403"], summary: "耶穌受難節" }, { dtstart: ["20260404"], summary: "清明節" }, { dtstart: ["20260406"], summary: "復活節" }, { dtstart: ["20260501"], summary: "勞動節" }, { dtstart: ["20260524"], summary: "佛誕" }, { dtstart: ["20260619"], summary: "端午節" }, { dtstart: ["20260701"], summary: "特區成立紀念日" }, { dtstart: ["20260926"], summary: "中秋節翌日" }, { dtstart: ["20261001"], summary: "國慶日" }, { dtstart: ["20261019"], summary: "重陽節" }, { dtstart: ["20261225"], summary: "聖誕節" }, { dtstart: ["20261226"], summary: "聖誕節後第一個周日" }
+            ];
 
-        function calculateNextHoliday(events) {
             const today = new Date();
             today.setHours(0,0,0,0);
             events.sort((a, b) => parseInt(a.dtstart[0]) - parseInt(b.dtstart[0]));
@@ -283,34 +263,56 @@
             } catch (e) {}
         }
         
-        // 5. 天文台風速 API (修復版：加入 Proxy 並精準讀取第 3 欄風速資料)
+        // 5. 天文台風速 API (官方直連，優先使用天文台 CORS，無懼 Proxy 封鎖)
         async function fetchWind() {
             try {
                 const url = 'https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv';
-                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+                
+                // 優先使用官方直連 (加上 cache: no-store 保證最新)
+                const res = await fetch(url, { cache: "no-store" });
+                
                 if (res.ok) {
                     const text = await res.text();
                     const lines = text.split('\n');
                     let windSpeed = '--';
                     
                     for (let line of lines) {
-                        if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('天水圍')) {
+                        if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('打鼓嶺')) {
                             const cols = line.split(',');
-                            // 天文台 CSV 格式: 站名, 風向, 10分鐘平均風速(第3欄), 最高陣風
+                            // cols[0]: 站名, cols[1]: 風向, cols[2]: 10分鐘平均風速
                             if (cols.length >= 3 && cols[2].trim() !== '') {
                                 windSpeed = cols[2].trim() + ' km/h';
                                 break;
                             }
                         }
                     }
-                    if (windSpeed !== '--') {
-                        document.getElementById('wind-speed').innerText = windSpeed;
-                    } else {
-                        document.getElementById('wind-speed').innerText = '微風';
-                    }
+                    document.getElementById('wind-speed').innerText = windSpeed !== '--' ? windSpeed : '微風';
+                } else {
+                    throw new Error("直連失敗");
                 }
             } catch (e) {
-                document.getElementById('wind-speed').innerText = '暫無';
+                // 如果官方直連都失敗，先用後備 Proxy
+                try {
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv');
+                    const res2 = await fetch(proxyUrl);
+                    if(res2.ok) {
+                        const text = await res2.text();
+                        const lines = text.split('\n');
+                        let windSpeed = '--';
+                        for (let line of lines) {
+                            if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園')) {
+                                const cols = line.split(',');
+                                if (cols.length >= 3 && cols[2].trim() !== '') {
+                                    windSpeed = cols[2].trim() + ' km/h';
+                                    break;
+                                }
+                            }
+                        }
+                        document.getElementById('wind-speed').innerText = windSpeed !== '--' ? windSpeed : '微風';
+                    }
+                } catch(e2) {
+                    document.getElementById('wind-speed').innerText = '暫無';
+                }
             }
         }
 
@@ -441,7 +443,7 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 9. 交通消息 API (穩定版 API 讀取摘要 + 直達按鈕)
+        // 9. 交通消息 API
         async function fetchTraffic() {
             try {
                 const rthkUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_tdtraffic.xml';
@@ -461,7 +463,7 @@
 
                     html += `<div class="traffic-item">🚗 ${title}</div>`;
                     validCount++;
-                    if (validCount >= 2) break; // 最多顯示 2 條突發
+                    if (validCount >= 2) break;
                 }
 
                 if (validCount === 0) {
@@ -471,8 +473,7 @@
                 }
 
             } catch (e) {
-                // 如果 API 真係因為網絡環境連唔上，優雅降級
-                document.getElementById('traffic-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入摘要失敗，請點擊下方按鈕直接查看。</div>';
+                document.getElementById('traffic-data').innerHTML = '<div style="color: #999; font-size: 0.9em;">自動載入摘要失敗，請點擊下方按鈕直接查看。</div>';
             }
         }
         
