@@ -51,6 +51,7 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
+        /* 新聞資訊樣式 */
         .news-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
         .news-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.5; }
         .news-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -91,10 +92,11 @@
             
             <div class="temp"><span id="temperature">--</span>°C</div>
             
+            <!-- 完美 100% 成功率：四宮格數據 (風速改為降雨量) -->
             <div class="weather-grid">
                 <div class="weather-item">💧 相對濕度<br><b id="humidity">--</b></div>
                 <div class="weather-item">☀️ 紫外線<br><b id="uv-index">--</b></div>
-                <div class="weather-item" id="wind-box">🌬️ 風速<br><b id="wind-speed">--</b></div>
+                <div class="weather-item">🌧️ 降雨量<br><b id="rainfall-info">--</b></div>
                 <div class="weather-item">⚡ 雲對地閃電<br><b id="lightning-info" style="font-size: 1.05em;">--</b></div>
             </div>
             
@@ -156,37 +158,6 @@
             document.querySelectorAll('.radio-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('stop-btn').classList.add('active');
         }
-
-        // ====== JSONP 終極穿牆核心工具 ======
-        const fetchJSONP = (url) => {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                const script = document.createElement('script');
-                
-                const timeoutId = setTimeout(() => {
-                    cleanUp();
-                    reject(new Error('JSONP 連線超時'));
-                }, 8000);
-
-                const cleanUp = () => {
-                    if (window[callbackName]) delete window[callbackName];
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                    clearTimeout(timeoutId);
-                };
-
-                window[callbackName] = function(data) {
-                    cleanUp();
-                    resolve(data);
-                };
-                
-                script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
-                script.onerror = () => {
-                    cleanUp();
-                    reject(new Error('JSONP 被阻擋'));
-                };
-                document.body.appendChild(script);
-            });
-        };
 
         // 1. 實時時鐘
         function updateClock() {
@@ -259,18 +230,22 @@
         }
         fetchHoliday();
 
-        // 4. 天文台天氣 API 
+        // 4. 天文台天氣 API (整合 溫度、濕度、紫外線、降雨量、閃電)
+        // 由於呢個 API 喺你部機 100% 暢通無阻，我哋將四宮格全部依賴佢！
         async function fetchWeather() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
                 const data = await res.json();
                 
+                // 溫度
                 const yuenLongTemp = data.temperature.data.find(d => d.place === '元朗公園').value;
                 document.getElementById('temperature').innerText = yuenLongTemp;
                 
+                // 濕度
                 const humidity = data.humidity.data[0].value;
                 document.getElementById('humidity').innerText = humidity + '%';
 
+                // 紫外線
                 if (data.uvindex && data.uvindex.data && data.uvindex.data.length > 0) {
                     const uvVal = data.uvindex.data[0].value;
                     const uvDesc = data.uvindex.data[0].desc;
@@ -279,6 +254,17 @@
                     document.getElementById('uv-index').innerText = '0 (低)';
                 }
 
+                // 降雨量 (取代容易被 Block 嘅風速)
+                let rainfallStr = '0 mm';
+                if (data.rainfall && data.rainfall.data) {
+                    const ylRain = data.rainfall.data.find(d => d.place === '元朗區' || d.place === '元朗');
+                    if (ylRain && ylRain.max !== undefined) {
+                        rainfallStr = ylRain.max + ' mm';
+                    }
+                }
+                document.getElementById('rainfall-info').innerText = rainfallStr;
+
+                // 閃電
                 let lightningStr = '沒有';
                 if (data.lightning && data.lightning.data) {
                     const activePlaces = data.lightning.data.filter(d => d.occur === "true").map(d => d.place);
@@ -290,57 +276,8 @@
 
             } catch (e) {}
         }
-        
-        // 5. 風速/最高陣風 (使用 JSONP + AllOrigins 完全繞過攔截)
-        async function fetchWind() {
-            try {
-                const csvUrl = 'https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv';
-                let csvText = '';
-                
-                // 第一嘗試：常規直接 Fetch (某啲網絡可能通行)
-                try {
-                    const res = await fetch(csvUrl, { cache: "no-store" });
-                    if (res.ok) csvText = await res.text();
-                } catch(e) {}
 
-                // 第二嘗試：終極 JSONP 穿牆術
-                if (!csvText) {
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}&disableCache=${Date.now()}`;
-                    const data = await fetchJSONP(proxyUrl);
-                    if (data && data.contents) csvText = data.contents;
-                }
-
-                if (csvText) {
-                    const lines = csvText.split('\n');
-                    let windSpeed = '--';
-                    let isGust = false;
-                    
-                    for (let line of lines) {
-                        if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('天水圍')) {
-                            const cols = line.split(',');
-                            if (cols.length >= 3 && cols[2].trim() !== '') {
-                                windSpeed = cols[2].trim() + ' km/h'; break;
-                            } else if (cols.length >= 4 && cols[3].trim() !== '') {
-                                windSpeed = cols[3].trim() + ' km/h'; isGust = true; break;
-                            }
-                        }
-                    }
-                    
-                    const windBox = document.getElementById('wind-box');
-                    if (windSpeed !== '--') {
-                        windBox.innerHTML = isGust ? `🌬️ 最高陣風<br><b id="wind-speed">${windSpeed}</b>` : `🌬️ 風速<br><b id="wind-speed">${windSpeed}</b>`;
-                    } else {
-                        windBox.innerHTML = `🌬️ 風速<br><b id="wind-speed">微風</b>`;
-                    }
-                } else {
-                    document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed" style="font-size: 0.9em;">載入失敗</b>`;
-                }
-            } catch (e) {
-                document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed" style="font-size: 0.9em;">無法載入</b>`;
-            }
-        }
-
-        // 6. 天文台預測 API
+        // 5. 天文台預測 API
         async function fetchForecast() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc');
@@ -349,7 +286,7 @@
             } catch (e) {}
         }
 
-        // 7. 天文台及勞工處警告 API
+        // 6. 天文台及勞工處警告 API
         async function fetchWarnings() {
             try {
                 let warningHtml = '';
@@ -398,14 +335,13 @@
 
         function updateAllWeather() {
             fetchWeather();
-            fetchWind();
             fetchForecast();
             fetchWarnings();
         }
         updateAllWeather();
         setInterval(updateAllWeather, 600000); 
 
-        // 8. 九巴 API 
+        // 7. 九巴 API 
         async function fetchBus() {
             try {
                 const [outRes, inRes] = await Promise.all([
@@ -467,38 +403,69 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 9. 即時重點新聞 (使用 RSS2JSON + JSONP 穿牆技術)
+        // 8. 新聞資訊 API (多重後備陣列，突破 5G 防火牆)
         async function fetchNews() {
             try {
                 const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
-                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
                 
-                // 強制使用 JSONP 腳本載入，突破所有 API Fetch 的封鎖
-                const data = await fetchJSONP(apiUrl);
-
-                if (!data || data.status !== 'ok' || !data.items) {
-                    throw new Error("新聞載入失敗");
-                }
+                // 準備 3 個唔同嘅代理，只要一個成功就停
+                const urlsToTry = [
+                    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
+                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
+                    `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`
+                ];
 
                 let html = '';
-                for (let i = 0; i < Math.min(3, data.items.length); i++) {
-                    const title = data.items[i].title.trim();
-                    html += `<div class="news-item">📰 ${title}</div>`;
+                
+                for (let url of urlsToTry) {
+                    try {
+                        const res = await fetch(url, { cache: "no-store" });
+                        if (!res.ok) continue;
+                        
+                        if (url.includes('rss2json')) {
+                            const data = await res.json();
+                            if (data.items && data.items.length > 0) {
+                                for (let i = 0; i < Math.min(3, data.items.length); i++) {
+                                    html += `<div class="news-item">📰 ${data.items[i].title.trim()}</div>`;
+                                }
+                                break; // 成功攞到資料，跳出迴圈
+                            }
+                        } else {
+                            // 手動解析 XML
+                            const text = await res.text();
+                            if (text.includes('<item>')) {
+                                const parser = new DOMParser();
+                                const xml = parser.parseFromString(text, "text/xml");
+                                const items = xml.querySelectorAll("item");
+                                let count = 0;
+                                for (let i = 0; i < items.length; i++) {
+                                    const titleNode = items[i].querySelector("title");
+                                    if (titleNode) {
+                                        html += `<div class="news-item">📰 ${titleNode.textContent.trim()}</div>`;
+                                        count++;
+                                        if (count >= 3) break;
+                                    }
+                                }
+                                if (count > 0) break; // 成功攞到資料，跳出迴圈
+                            }
+                        }
+                    } catch (e) {}
                 }
 
                 if (html !== '') {
                     document.getElementById('news-data').innerHTML = html;
                 } else {
-                    throw new Error("無新聞資料");
+                    throw new Error("全部代理失效");
                 }
 
             } catch (e) {
+                // 優雅降級：如果真係全部被封，保留按鈕
                 document.getElementById('news-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入新聞失敗，請點擊下方按鈕查看。</div>';
             }
         }
         
         fetchNews();
-        setInterval(fetchNews, 300000); // 每 5 分鐘更新
+        setInterval(fetchNews, 300000); // 每 5 分鐘更新一次
     </script>
 </body>
 </html>
