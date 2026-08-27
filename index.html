@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>實時 Dashboard</title>
     <style>
-        /* 縮減了整體 padding 和 gap，令畫面更緊湊 */
         body { font-family: -apple-system, sans-serif; background-color: #fff8f0; margin: 0; padding: 15px; display: flex; flex-direction: column; gap: 12px; height: 100vh; box-sizing: border-box; overflow: hidden; }
         .card { background: white; border-radius: 15px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
@@ -19,7 +18,6 @@
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
         
-        /* 手機版優化：加入 padding-bottom 確保滑到最底唔會被遮住 */
         @media (max-width: 768px) {
             .content { flex-direction: column; overflow-y: auto; }
             body { height: auto; min-height: 100vh; overflow: auto; padding-bottom: 40px; }
@@ -62,7 +60,6 @@
 
         .bible-panel { padding: 12px 15px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 1px dashed #eee; box-shadow: none; }
         
-        /* 音樂按鈕樣式 */
         .audio-panel { padding-top: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; border-top-left-radius: 0; border-top-right-radius: 0; margin-top: -12px; }
         .radio-controls { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 5px; justify-content: center; }
         .radio-btn { flex: 1; min-width: 80px; padding: 8px 10px; border: none; border-radius: 20px; background: #f0f0f0; color: #555; cursor: pointer; font-size: 0.9em; transition: all 0.2s; font-weight: bold; text-align: center; }
@@ -264,27 +261,26 @@
             } catch (e) {}
         }
         
-        // 5. 天文台風速/最高陣風自動切換 API
+        // 5. 天文台風速/最高陣風 (使用 AllOrigins 嘅 GET 模式，將 CSV 變 JSON，繞過防火牆)
         async function fetchWind() {
             try {
                 const url = 'https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind_uc.csv';
-                
-                // 使用官方直連或代理
-                const fetchUrls = [
-                    url,
-                    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}&disableCache=${Date.now()}`,
-                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-                ];
-                
                 let csvText = '';
-                for (let fetchUrl of fetchUrls) {
-                    try {
-                        const res = await fetch(fetchUrl, { cache: "no-store" });
-                        if (res.ok) {
-                            csvText = await res.text();
-                            if (csvText.includes('流浮山')) break;
-                        }
-                    } catch (e) {}
+                
+                // 優先使用 JSON Wrapper 模式，避免 Safari 阻擋 raw text
+                try {
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&disableCache=${Date.now()}`;
+                    const res = await fetch(proxyUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        csvText = data.contents;
+                    }
+                } catch(e) {}
+                
+                // 如果失敗再試直連
+                if (!csvText) {
+                    const res2 = await fetch(url, { cache: "no-store" });
+                    if (res2.ok) { csvText = await res2.text(); }
                 }
 
                 if (csvText) {
@@ -295,13 +291,13 @@
                     for (let line of lines) {
                         if (line.includes('流浮山') || line.includes('濕地公園') || line.includes('元朗公園') || line.includes('天水圍')) {
                             const cols = line.split(',');
-                            // cols[2] 係「10分鐘平均風速」, cols[3] 係「最高陣風」
+                            // cols[2]: 平均風速, cols[3]: 最高陣風
                             if (cols.length >= 3 && cols[2].trim() !== '') {
                                 windSpeed = cols[2].trim() + ' km/h';
                                 break;
                             } else if (cols.length >= 4 && cols[3].trim() !== '') {
                                 windSpeed = cols[3].trim() + ' km/h';
-                                isGust = true; // 平均風速無資料，轉用最高陣風
+                                isGust = true; 
                                 break;
                             }
                         }
@@ -309,20 +305,15 @@
                     
                     const windBox = document.getElementById('wind-box');
                     if (windSpeed !== '--') {
-                        if (isGust) {
-                            // 動態將標題改為「最高陣風」
-                            windBox.innerHTML = `🌬️ 最高陣風<br><b id="wind-speed">${windSpeed}</b>`;
-                        } else {
-                            windBox.innerHTML = `🌬️ 風速<br><b id="wind-speed">${windSpeed}</b>`;
-                        }
+                        windBox.innerHTML = isGust ? `🌬️ 最高陣風<br><b id="wind-speed">${windSpeed}</b>` : `🌬️ 風速<br><b id="wind-speed">${windSpeed}</b>`;
                     } else {
                         windBox.innerHTML = `🌬️ 風速<br><b id="wind-speed">微風</b>`;
                     }
                 } else {
-                    document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed">暫無</b>`;
+                    document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed" style="font-size: 0.9em;">載入失敗</b>`;
                 }
             } catch (e) {
-                document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed">暫無</b>`;
+                document.getElementById('wind-box').innerHTML = `🌬️ 風速<br><b id="wind-speed" style="font-size: 0.9em;">無法載入</b>`;
             }
         }
 
@@ -453,26 +444,52 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 9. 新聞資訊 API (取代交通消息)
+        // 9. 即時新聞 API (港台新聞，同樣用 JSON 包裝以穿透 Firewall)
         async function fetchNews() {
             try {
-                // 香港電台 (RTHK) 即時重點新聞 RSS
-                const rthkNewsUrl = 'https://news.rthk.hk/rthk/ch/rss/c_expressnews_bnews.xml';
-                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rthkNewsUrl)}`);
-                const data = await res.json();
+                // 港台本地新聞 RSS 原檔
+                const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
+                let xmlText = '';
 
-                if (data.status !== 'ok' || !data.items) {
-                    throw new Error("新聞載入失敗");
+                // 使用 AllOrigins GET 模式，將 XML 轉換為 JSON 繞過限制
+                try {
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}&disableCache=${Date.now()}`;
+                    const res = await fetch(proxyUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        xmlText = data.contents;
+                    }
+                } catch(e) {}
+
+                if (!xmlText || !xmlText.includes('<item>')) {
+                    throw new Error("無法連接港台新聞");
                 }
 
+                // 成功取得資料後，手動解析 XML
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlText, "text/xml");
+                const items = xml.querySelectorAll("item");
+                
                 let html = '';
-                // 顯示最頂的 3 則重點新聞
-                for (let i = 0; i < Math.min(3, data.items.length); i++) {
-                    const title = data.items[i].title.trim();
+                let count = 0;
+
+                for (let i = 0; i < items.length; i++) {
+                    const titleNode = items[i].querySelector("title");
+                    if (!titleNode) continue;
+                    
+                    let title = titleNode.textContent.trim();
                     html += `<div class="news-item">📰 ${title}</div>`;
+                    count++;
+                    
+                    // 顯示最新 3 條新聞
+                    if (count >= 3) break; 
                 }
 
-                document.getElementById('news-data').innerHTML = html;
+                if (count > 0) {
+                    document.getElementById('news-data').innerHTML = html;
+                } else {
+                    throw new Error("無新聞資料");
+                }
 
             } catch (e) {
                 document.getElementById('news-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入新聞失敗，請點擊下方按鈕查看。</div>';
