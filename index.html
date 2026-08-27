@@ -13,7 +13,17 @@
         .time-section { color: #007aff; }
         #time { font-size: 2.6em; font-weight: bold; line-height: 1; letter-spacing: -1px; }
         .date-section { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
-        #date { font-size: 1.2em; color: #ff6b81; font-weight: bold; margin-bottom: 5px; line-height: 1; }
+        
+        /* 日期與更新按鈕同一行 */
+        .date-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+        #date { font-size: 1.2em; color: #ff6b81; font-weight: bold; line-height: 1; margin: 0; }
+        
+        /* 更新按鈕樣式 */
+        #refresh-btn { background: #f1f2f6; border: none; color: #555; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1em; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #refresh-btn:active { background: #dfe4ea; transform: scale(0.9); }
+        .spin { animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
         #holiday-countdown { font-size: 0.8em; color: #ff9f43; font-weight: bold; background: #fff3e0; padding: 4px 8px; border-radius: 8px; border: 1px solid #ffeaa7; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
         .content { display: flex; gap: 12px; flex: 1; min-height: 0; }
@@ -51,7 +61,6 @@
         .eta { color: #2ed573; font-weight: bold; font-size: 1.2em; }
         .eta-exact { font-size: 0.8em; color: #888; margin-top: 2px; }
         
-        /* 新聞資訊樣式 */
         .news-panel { display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
         .news-item { font-size: 0.9em; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; line-height: 1.5; }
         .news-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -77,7 +86,13 @@
             <div id="time">載入中...</div>
         </div>
         <div class="date-section">
-            <div id="date"></div>
+            <!-- 加入了手動更新按鈕 -->
+            <div class="date-row">
+                <div id="date"></div>
+                <button id="refresh-btn" onclick="manualRefresh()" title="立即更新數據">
+                    <div id="refresh-icon">🔄</div>
+                </button>
+            </div>
             <div id="holiday-countdown">計算假期中...</div>
         </div>
     </div>
@@ -92,7 +107,6 @@
             
             <div class="temp"><span id="temperature">--</span>°C</div>
             
-            <!-- 完美 100% 成功率：四宮格數據 (風速改為降雨量) -->
             <div class="weather-grid">
                 <div class="weather-item">💧 相對濕度<br><b id="humidity">--</b></div>
                 <div class="weather-item">☀️ 紫外線<br><b id="uv-index">--</b></div>
@@ -159,6 +173,23 @@
             document.getElementById('stop-btn').classList.add('active');
         }
 
+        // 手動更新按鈕功能
+        function manualRefresh() {
+            const icon = document.getElementById('refresh-icon');
+            // 加入旋轉特效
+            icon.classList.add('spin');
+            
+            // 觸發所有資料更新
+            updateAllWeather();
+            fetchBus();
+            fetchNews();
+            
+            // 1.5秒後移除旋轉特效，模擬載入完成的手感
+            setTimeout(() => {
+                icon.classList.remove('spin');
+            }, 1500);
+        }
+
         // 1. 實時時鐘
         function updateClock() {
             const now = new Date();
@@ -182,7 +213,7 @@
                 "「你不要害怕，因為我與你同在；不要驚惶，因為我是你的神。」(以賽亞書 41:10)",
                 "「耶和華是我的牧者，我必不致缺乏。」(詩篇 23:1)",
                 "「堅心倚賴你的，你必保守他十分平安，因為他倚靠你。」(以賽亞書 26:3)",
-                "「你們看那天上的飛鳥，也不種，也不收，也不積蓄在倉裏，你們的天父尚且養活牠。」(馬太福音 6:26)",
+                "「你們看那天上的飛鳥，也不種，也不收，也不積蓄在倉裏，全部都是天父所養活。」(馬太福音 6:26)",
                 "「你的話是我腳前的燈，是我路上的光。」(詩篇 119:105)",
                 "「要常常喜樂，不住地禱告，凡事謝恩。」(帖撒羅尼迦前書 5:16-18)",
                 "「我靠著那加給我力量的，凡事都能做。」(腓立比書 4:13)",
@@ -230,22 +261,18 @@
         }
         fetchHoliday();
 
-        // 4. 天文台天氣 API (整合 溫度、濕度、紫外線、降雨量、閃電)
-        // 由於呢個 API 喺你部機 100% 暢通無阻，我哋將四宮格全部依賴佢！
+        // 4. 天文台天氣 API (整合降雨量)
         async function fetchWeather() {
             try {
                 const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
                 const data = await res.json();
                 
-                // 溫度
                 const yuenLongTemp = data.temperature.data.find(d => d.place === '元朗公園').value;
                 document.getElementById('temperature').innerText = yuenLongTemp;
                 
-                // 濕度
                 const humidity = data.humidity.data[0].value;
                 document.getElementById('humidity').innerText = humidity + '%';
 
-                // 紫外線
                 if (data.uvindex && data.uvindex.data && data.uvindex.data.length > 0) {
                     const uvVal = data.uvindex.data[0].value;
                     const uvDesc = data.uvindex.data[0].desc;
@@ -254,7 +281,6 @@
                     document.getElementById('uv-index').innerText = '0 (低)';
                 }
 
-                // 降雨量 (取代容易被 Block 嘅風速)
                 let rainfallStr = '0 mm';
                 if (data.rainfall && data.rainfall.data) {
                     const ylRain = data.rainfall.data.find(d => d.place === '元朗區' || d.place === '元朗');
@@ -264,7 +290,6 @@
                 }
                 document.getElementById('rainfall-info').innerText = rainfallStr;
 
-                // 閃電
                 let lightningStr = '沒有';
                 if (data.lightning && data.lightning.data) {
                     const activePlaces = data.lightning.data.filter(d => d.occur === "true").map(d => d.place);
@@ -403,12 +428,11 @@
         fetchBus();
         setInterval(fetchBus, 60000);
 
-        // 8. 新聞資訊 API (多重後備陣列，突破 5G 防火牆)
+        // 8. 新聞資訊 API (多重後備陣列)
         async function fetchNews() {
             try {
                 const rssUrl = 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml';
                 
-                // 準備 3 個唔同嘅代理，只要一個成功就停
                 const urlsToTry = [
                     `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
                     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
@@ -428,10 +452,9 @@
                                 for (let i = 0; i < Math.min(3, data.items.length); i++) {
                                     html += `<div class="news-item">📰 ${data.items[i].title.trim()}</div>`;
                                 }
-                                break; // 成功攞到資料，跳出迴圈
+                                break; 
                             }
                         } else {
-                            // 手動解析 XML
                             const text = await res.text();
                             if (text.includes('<item>')) {
                                 const parser = new DOMParser();
@@ -446,7 +469,7 @@
                                         if (count >= 3) break;
                                     }
                                 }
-                                if (count > 0) break; // 成功攞到資料，跳出迴圈
+                                if (count > 0) break; 
                             }
                         }
                     } catch (e) {}
@@ -459,13 +482,12 @@
                 }
 
             } catch (e) {
-                // 優雅降級：如果真係全部被封，保留按鈕
                 document.getElementById('news-data').innerHTML = '<div style="color: #999; font-size: 0.95em;">自動載入新聞失敗，請點擊下方按鈕查看。</div>';
             }
         }
         
         fetchNews();
-        setInterval(fetchNews, 300000); // 每 5 分鐘更新一次
+        setInterval(fetchNews, 300000); 
     </script>
 </body>
 </html>
